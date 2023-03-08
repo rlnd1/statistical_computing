@@ -561,6 +561,7 @@ gcd <- function(a, b) {
 gcd(45, 12)  # 3
 a  # unchanged 45
 ```
+Never change something in the "parent environment"!
 
 Similarly, the least common multiple of two natural numbers is their product divided by the GCD. We can re-use `gcd()` to create a compact function `lcm()`:
 
@@ -606,13 +607,19 @@ b <- a %% b  # a modulo b
 
 Our final version of the function `gcd()` uses *input checks*. Note: for very large numbers above $2^{50}$, the function would start to return garbage because of floating point issues.
 
+Integers bigger than 2^50 -> converted to a floating point number with precision -> algorithm will fail.
+So for cryptographic uses, we need to use packages that allow bigger precise integers.
+In Python, we don't have this issues.
+
+We don't do this for analysis (but for packages).
+
 ``` r
 # Greatest common divisor
 # a, b: positive integers
 gcd <- function(a, b) {
   stopifnot(
-    length(a) == 1, 
-    length(b) == 1,
+    "comment why" = length(a) == 1, 
+    "provide a number" = length(b) == 1,
     a >= 1,
     b >= 1,
     a == trunc(a),
@@ -732,11 +739,15 @@ library(ggplot2)
 
 # plot() applied to object of class "formula"
 class(price ~ color)
+# standard plot (not from ggplot2)
+# what is going on: plot finds the class of 'price ~ color' and calls plot.formula 
+# i.e. graphics:::plot.formula function (::: for internal functions)
 plot(price ~ color, data = diamonds)
 
 # plot() applied to object of class "factor". 
 # Note: the first class "ordered" is skipped as it does not have its own plot method
 class(diamonds$color)
+# two classes, here plot.factor is used
 plot(diamonds$color)
 ```
 
@@ -765,7 +776,7 @@ me  # same as print(me)
 # Nothing special so far. We first need a print() method for the "student" class
 print.student <- function(x, ...) {
   cat("Hi, I'm", x$given_name, x$family_name)
-  invisible(x)
+  invisible(x) # do not output x itself
 }
 
 print(me)  # same as me

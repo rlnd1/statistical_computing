@@ -37,6 +37,7 @@ ggplot(data = dataCar, mapping = aes(x = gender)) +
     b.  Draw a histogram of the vehicle value "veh_value" (in 10'000 Australian Dollars). Truncate values above 7 (this means: if a value is larger than 7, set it to 7).
     
 ```{r}
+# use pmin instead of rowwise + min (crazy inefficient)
 d <- dataCar %>% 
   rowwise %>% 
   mutate(trunc_veh_value = min(veh_value, 7))
@@ -65,7 +66,7 @@ Interpretation: The higher the age category, the lower the average number of cla
     d.  Bin "veh_value" into quartiles and analyze its association with the number of claims as in 1c.
 ```{r}
 d <- dataCar %>%
-  mutate(quartile_rank = ntile(veh_value,4)) %>% 
+  mutate(quartile_rank = (veh_value,4)) %>% 
   group_by(quartile_rank) %>% 
   summarise(avg_claims = mean(numclaims))
 

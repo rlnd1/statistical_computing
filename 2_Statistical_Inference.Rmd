@@ -115,6 +115,9 @@ for (n in c(1, 10, 50, 200)) {
 
 **Comment:** The distribution of the sample mean contracts more and more around the true mean 1.
 
+n is sample size
+nsim is the number of simulations
+
 ### Example: Illustrating the CLT
 
 The CLT (roughly) says that the standardized sample mean of a sufficiently large sample is approximately normal, no matter how "non-normal" the *individual* values $X_i$ are. We will illustrate this with the same code as above, now using *standardized* means, and replacing the inner loop by `replicate()` for convenience.
@@ -131,6 +134,7 @@ std_mean <- function(x, mu, sd) {
 set.seed(100)
 
 for (n in c(1, 10, 50, 200)) {
+  # replace for loop with replicate
   means <- replicate(nsims, std_mean(rexp(n), mu = 1, sd = 1))
   hist(means, breaks = 99, main = paste("n =", n), col = "orange",
        border = "orange", xlim = c(-4, 4), probability = TRUE)
@@ -140,8 +144,10 @@ for (n in c(1, 10, 50, 200)) {
 **Comments:**
 
 - The larger the sample size $n$, the more normal the histograms of the means appear. The difference between $n = 50$ and $n = 200$ is barely visible.
-- The case $n=1$ simply shows the histogram corresponding to a standard exponential distribution. It is very asymmetric and non-normal.
+- The case $n=1$ simply shows the histogram corresponding to a standard exponential distribution. It is very asymmetric and non-normal. (translated by -true mean)
 - Note that the sum of exponential random variables is Gamma distributed.
+
+replicate is not faster than for loop, but it looks nicer, e.g. `replicate(2, "hello")`
 
 ### From the CLT to confidence intervals
 

@@ -188,7 +188,7 @@ Let's use a sample of values drawn from an exponential distribution to calculate
 set.seed(1)
 
 n <- 50
-x <- rexp(n)
+x <- rexp(n) # not to close to normal
 
 mu_hat <- mean(x)
 se_hat <- sd(x) / sqrt(n)
@@ -242,6 +242,7 @@ head(results)
 
 # Proportion correct
 mean(results$ok)
+# not so good, it is anti-conservative (in practice we don't see this number since we only have one sample)
 
 # Plot confidence intervals of 100 samples (lengthy ggplot...)
 ggplot(results[1:100, ], aes(x = rank(estimate), y = estimate, color = ok)) +
@@ -261,6 +262,8 @@ ggplot(results[1:100, ], aes(x = rank(estimate), y = estimate, color = ok)) +
     title = "Confidence intervals calculated from 100 samples"
   )
 ```
+
+Purple intervals are the "wrong" ones, which do not contain the true parameter 1. Here we see what 95% means: If we have 100 samples, around 95 contain the true parameter.
 
 **Comments:** Based on 10'000 samples, we estimate the real coverage probability as 93%, which is lower than the stated one (95%). This undesirable property might be a consequence of the skeweness of the data distribution. (In the plot, five of 100 confidence intervals do not cover $\mu=1$, corresponding to a real coverage probability of exactly 95%.)
 
@@ -392,6 +395,8 @@ plot_stability(boot)
 
 **Comment:** In this example, around 1000 resamples would have been enough to find a stable Bootstrap estimate of the standard error of the median. In contrast to the last example on the mean, we cannot compare with a "standard" estimate - we have to rely on the validity of the Bootstrap. Note: Such stability curve can be plotted in all situations.
 
+Here 200 would not be enough (still quite off)
+
 ## Bootstrap confidence intervals
 
 The Bootstrap gives us a convenient way to estimate the standard error $\sigma(\hat \theta)$ of any estimator $\hat \theta$. Assuming asymptotic normality of $\hat \theta$, we can calculate standard normal $(1-\alpha)\cdot 100\%$-confidence intervals
@@ -412,11 +417,17 @@ x <- rexp(n)  # Population median is ln(2) / lambda = ln(2)
 
 boot <- replicate(2000, median(sample(x, replace = TRUE)))
 median(x) + c(-1, 1) * qnorm(0.975) * sd(boot)
+
+# no sqrt(n) because this is hidden in the sd(boot)
 ```
 
 In the case of the median (and other quantiles), we actually do not need to rely on the Bootstrap to calculate confidence intervals as there is a fully nonparametric method based on order statistics. It is exact in the sense that the intervals are never anti-conservative, see @hahn2014. Additionally, it does not require resampling.
 
 ```{r}
+# non-parametric method, deterministic, exact (always conservative)
+# order statistic based method
+# Lutz Dümbgen approach
+# no SE involved, no Wald CI
 ci_median_nonpar <- function(x, alpha = 0.05, q = 0.5) {
   K <- qbinom(c(alpha / 2, 1 - alpha / 2), length(x), q) + 0:1
   sort(x)[K]
@@ -507,6 +518,8 @@ if (FALSE) {  # Trick to skip code block without commenting out
 
 (coverage_probs <- apply(result, 1:2, FUN = mean))
 
+# surprising: CIs are quite good even for small samples
+
 # Some tidyverse magic for visualization
 library(tidyverse)
 
@@ -547,7 +560,7 @@ boot.ci(boot_dist)
 - "Normal": Bias corrected version of our standard normal interval.
 - "Basic": Flipped version of the percentile CI. We have not considered it.
 - "Percentile": Percentile confidence interval
-- "BCa": Bias-corrected and accelerated. In theory the most accurate of the four, and thus in practice often the recommended type of interval.
+- "BCa": Bias-corrected and accelerated. In theory the most accurate of the four, and thus in practice often the recommended type of interval. (even for smaller sample size, it will converge faster), choose this one if it is used for publication
 
 **Remark on bias correction**: Sometimes, the Bootstrap is also used for bias correction of the estimate $\hat \theta$. We do not consider it here.
 
@@ -580,6 +593,7 @@ set.seed(1)
 m <- 15
 n <- 25
 
+# mean 2 -> parameter 1/2
 y1 <- rexp(m, 1 / 2)
 y2 <- rexp(n, 1)
 

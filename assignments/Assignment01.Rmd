@@ -66,7 +66,7 @@ Interpretation: The higher the age category, the lower the average number of cla
     d.  Bin "veh_value" into quartiles and analyze its association with the number of claims as in 1c.
 ```{r}
 d <- dataCar %>%
-  mutate(quartile_rank = (veh_value,4)) %>% 
+  mutate(quartile_rank = ntile(veh_value,4)) %>% 
   group_by(quartile_rank) %>% 
   summarise(avg_claims = mean(numclaims))
 
@@ -83,5 +83,148 @@ Interpretation: The higher the value of the vehicle, the higher the average numb
 ```{r}
 p %>% 
   ggplotly()
+```
+
+## 4. Sieve of Eratosthenes
+The sieve of Eratosthenes is an ancient algorithm to get all prime numbers up to any given limit $n$, see [Wikipedia](https://en.wikipedia.org/wiki/Sieve_of_Eratosthenes). Write a function `sieve_of_eratosthenes(n)` that returns all prime numbers up to $n$. Benchmark the results for $n = 10^5$ with the package "microbenchmark". Mind your coding style!
+
+Naive approach:
+```{r}
+sieve_of_eratosthenes <- function(n) {
+  df <- data.frame(seq(2,n))
+  colnames(df) <- c("x")
+  
+  p <- 2
+  i <- 1
+  done <- FALSE
+  while(!done) {
+    df <- df %>% filter(x %% p != 0 | x == p)
+    
+    i <- i + 1
+    if (i > nrow(df)) {
+      done = TRUE
+    } else {
+      p <- df$x[i]
+    }
+  }
+  df
+}
+head(sieve_of_eratosthenes(1000))
+```
+```{r}
+sieve_of_eratosthenes_opt <- function(n) {
+  v <- seq(2,n)
+  
+  p <- 2
+  i <- 1
+  done <- FALSE
+  while(!done) {
+    v <- v[v %% p != 0 | v == p]
+    
+    i <- i + 1
+    if (i > length(v)) {
+      done = TRUE
+    } else {
+      p <- v[i]
+    }
+  }
+  v
+}
+
+head(sieve_of_eratosthenes_opt(1000))
+```
+
+
+Comparison
+```{r}
+library(microbenchmark)
+n = 10000
+microbenchmark(
+  sieve_of_eratosthenes(n),
+  sieve_of_eratosthenes_opt(n),
+  times = 2
+)
+
+```
+
+## 4
+In Exercise 1c, we have calculated and plotted the average number of claims per level of "agecat" in the `dataCar` data.
+
+    a.  Write a function `avg_claim_counts(v)` that provides such a visualization for any discrete variable `v`.
+  
+Source: https://shixiangwang.github.io/tidyeval-chinese/dplyr.html
+    
+```{r}
+avg_claim_counts <- function(v) {
+  v <- enquo(v)
+  
+  d <- dataCar %>% 
+  group_by(!!v) %>% 
+  summarise(avg_claims = mean(numclaims))
+
+  p <- ggplot(d, mapping = aes(x = !!v, y = avg_claims)) +
+    geom_point(color = "black") +
+    xlab(v) +
+    ggtitle("Scatterplot")
+  p
+}
+
+avg_claim_counts(agecat)
+avg_claim_counts(gender)
+avg_claim_counts(area)
+```
+
+    b.  Extend this function with a second argument `interactive` to control whether the resulting plot is interactive or not.
+    
+```{r}
+library(plotly)
+
+avg_claim_counts_2 <- function(v, interactive = FALSE) {
+  v <- enquo(v)
+  
+  d <- dataCar %>% 
+  group_by(!!v) %>% 
+  summarise(avg_claims = mean(numclaims))
+
+  p <- ggplot(d, mapping = aes(x = !!v, y = avg_claims)) +
+    geom_point(color = "black") +
+    ggtitle("Scatterplot")
+  if (interactive) {
+    p <- p %>% 
+      ggplotly()
+  }
+  p
+}
+
+avg_claim_counts_2(agecat, TRUE)
+avg_claim_counts_2(gender, TRUE)
+avg_claim_counts_2(area, TRUE)
+```
+## 5
+
+Extend the "student" class from Section "plot, print, summary" by the optional information "semester". It represents the number of semesters the student is already registered. Add a `summary()` method that would neatly print the name and the semester of the student.
+
+```{r}
+# Function that creates an object of class "student"
+student <- function(given_name, family_name, semester = NULL) {
+  out <- list(
+    given_name = given_name,
+    family_name = family_name,
+    semester = semester
+  )
+  class(out) <- "student"
+  out
+}
+
+me <- student("Roland", "Widmer")
+me2 <- student("Roland", "Widmer", 11)
+
+summary.student <- function(x, ...) {
+  cat(x$given_name, x$family_name, ifelse(x$semester, paste(", Semester:", x$semester), ""))
+  invisible(x) # do not output x itself
+}
+
+summary(me)
+summary(me2)
 ```
 

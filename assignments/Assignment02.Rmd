@@ -1,0 +1,169 @@
+---
+title: "Assignment02"
+author: "Roland Widmer"
+date: "2023-03-11"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
+
+## 1
+
+In this exercise, we consider 95%-confidence intervals for the true mean of a uniform distribution.
+a.
+Generate a sample of 30 observations from the standard uniform distribution and calculate a Student confidence interval for the true mean $\mu$.
+Interpret it.
+
+```{r}
+set.seed(1)
+
+n <- 30
+alpha <- 0.05
+sample <- runif(n)
+
+mu_hat <- mean(sample)
+se_hat <- sd(sample) / sqrt(n)
+t <- qt(1 - alpha/2, df = n-1) 
+
+# Student-confidence interval for mu
+ci_student <- c(mu_hat - t* se_hat, mu_hat + t * se_hat)
+ci_student
+```
+
+Interpretation: True mean of 0.5 is contained.
+Confidence bound is quite conservative.
+
+    b. Calculate the Bootstrap estimate of the standard error and compare it with the usual estimate of the standard error. Plot a histogram of the Bootstrap replications.
+
+Usual estimate of the standard error:
+
+```{r}
+# sample standard deviation
+sd_hat <- sd(sample)
+
+se_hat <- sd_hat / sqrt(n)
+se_hat
+
+```
+
+Bootstrap estimate of SE
+
+```{r}
+B <- 2000
+boot <- numeric(B)
+
+for (i in 1:B) {
+  x_boot <- sample(sample, replace = TRUE)
+  boot[i] <- mean(x_boot)
+}
+
+# Bootstrapped standard error of the mean
+sd(boot)
+
+hist(boot)
+
+```
+
+Both estimators are close to each other.
+
+    c. Use the `plot_stability()` function of the lecture notes to figure out after how many Bootstrap samples the Bootstrap estimate of the standard error would stabilize.
+
+```{r}
+plot_stability <- function(x) {  # x is the vector of Bootstrap replications
+  df <- data.frame(x = x, b = 1:length(x))
+  df$se <- sapply(df$b, function(i) sd(x[1:i]))  # "cumsd"
+
+  ggplot(subset(df, b >= 20), aes(b, se)) +
+    geom_line(color = "chartreuse4") +
+    ggtitle("Stability of Bootstrap Estimate of Standard Error")
+}
+
+plot_stability(boot) +
+  geom_hline(yintercept = sd(sample) / sqrt(n))  # Estimated standard error of the mean
+```
+
+Around 750.
+
+    d. Calculate a standard normal Bootstrap CI and a percentile Bootstrap CI for $\mu$. Compare with the interval from 1a.
+
+```{r}
+
+
+ci_boot <- mu_hat + c(-1, 1) * qnorm(1 - alpha/2) * sd(boot)
+
+ci_boot
+ci_student
+
+```
+
+Close to each other.
+
+## 2
+
+Consider the two samples $y_1 = 1, 2, \dots, 21$ and $y_2 = 1, 2, \dots, 51$.
+a.
+Resample within groups to calculate a percentile Bootstrap CI for the true median difference $\theta = \text{Med}(y_2) - \text{Med}(y_1)$.
+Interpret the result.
+b.
+Calculate a standard normal Bootstrap CI for $\theta$.
+Compare the two solutions.
+
+```{r}
+
+y_1 = runif(21)
+y_2 = runif(51)
+
+estimator <- function(x, y) {
+  median(y) - median(x)
+}
+
+boot <- replicate(
+  9999,
+  estimator(
+    sample(y_1, replace = TRUE), 
+    sample(y_2, replace = TRUE)
+  )
+)
+
+ci_boot_perc <- quantile(boot, c(alpha/2, 1-alpha/2))
+ci_boot_std <- estimator(y_1, y_2) + c(-1, 1) * qnorm(1 - alpha/2) * sd(boot)
+
+ci_boot_perc
+ci_boot_std
+```
+
+## 3
+
+For the situation in Exercise 1, use simulation to estimate real coverage probabilities of the Student CI and the two types of Bootstrap CIs.
+What do you observe?
+
+```{r}
+
+```
+
+## 4
+
+Here, we study a test on Spearman's rank correlation.
+a.
+What is Spearman's rank correlation?
+b.
+Write a function `spearman_test2(x, y, B = 10000)` that calculates a one-sided permutation p value for the null hypothesis of no positive monotonic association.
+I.e., you want to show the alternative hypothesis that the true rank correlation is positive.
+c.
+Use a simulated example to compare with the corresponding p values from the "coin" package, and also using `stats::cor.test(x, y, method = "s", method = "greater")`.
+
+## 5
+
+In the situation of Exercise 4: Use simulation to compare your approach with `stats::cor.test()` regarding... a.
+... Type 1 error?
+(Work with independent normal random variables) b.
+... power?
+(Work with dependent normal random variables).
+c.
+How do you interpret your result?

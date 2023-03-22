@@ -114,6 +114,8 @@ b.
 Calculate a standard normal Bootstrap CI for $\theta$.
 Compare the two solutions.
 
+Important: order of y_2 and y_1.
+
 ```{r}
 
 y_1 = runif(21)
@@ -145,7 +147,57 @@ What do you observe?
 
 ```{r}
 
+library(tidyverse)
+
+n <- 30
+b <- 9999
+n_sim <- 1000
+
+set.seed(1)
+
+ci <- function(x, alpha = 0.05) {
+  q <- qt(1 - alpha / 2, df=n-1)
+  se <- sd(x) / sqrt(length(x))
+  mu_hat <- mean(x)
+  
+  boot <- replicate(B,
+    mean(sample(x, replace = TRUE))
+  )
+  
+  out <- c(mu_hat,
+    mu_hat + c(-1, 1) * q * se,
+    mu_hat + c(-1, 1) * qnorm(1 - alpha/2) * sd(boot),
+    quantile(boot, c(alpha/2, 1-alpha/2))
+  )
+  names(out) <- c("estimate", "l_std", "u_std", "l_boot", "u_boot", "l_perc", "u_perc")
+  
+  out
+}
+
+
+results <- replicate(n_sim, ci(runif(n))) %>% 
+  t() %>% 
+  data.frame() %>% 
+  mutate(ok_std = (l_std <= estimate) & (estimate <= u_std)) %>% 
+  mutate(ok_boot = (l_boot <= estimate) & (estimate <= u_boot)) %>% 
+  mutate(ok_boot_perc = (l_perc <= estimate) & (estimate <= u_perc))
+
+
+head(results)
+
+
+
 ```
+
+```{r}
+mean(results$ok_std)
+mean(results$ok_boot)
+mean(results$ok_boot_perc)
+```
+
+Coverage of 100% for all 3 CIs ...
+
+CI is not for the estimate, but for the true (unknown) parameter!
 
 ## 4
 

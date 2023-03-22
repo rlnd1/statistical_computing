@@ -131,6 +131,11 @@ sieve_of_eratosthenes_opt <- function(n) {
   v
 }
 
+# we need to loop only up to sqrt(n)
+# debugonce() to go in debug mode
+# see solution for C++ implementation with rcpp
+# all.equal() to check if two vectors are the same
+
 head(sieve_of_eratosthenes_opt(1000))
 ```
 

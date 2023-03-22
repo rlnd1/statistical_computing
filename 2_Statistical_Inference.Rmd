@@ -652,11 +652,14 @@ df <- data.frame(x = x, y = x^2)
 ggplot(df, aes(x, y)) +
   geom_point(color = "chartreuse4")
 
+# this is really high
+
 # Classic 95%-CI assuming bivariate normality
 c(cor.test(~ x + y, data = df)$conf.int)
 
 # Estimate
 estimator <- function(X) {
+  # correlation matrix, we only need a simple value
   cor(X)[1, 2]
 }
 (est <- estimator(df))
@@ -667,6 +670,12 @@ boot <- replicate(
   9999, 
   estimator(df[sample(nrow(df), replace = TRUE), ])
 )
+# we resample the row indizes
+# nrow(df) -> 25, so we have sample(25, replace = TRUE)
+# look at table(sample(25, replace = TRUE))
+# see the occurences of the indices
+# if we nest table, we can see, how many indizes twice, ...
+
 
 ggplot(data.frame(Estimate = boot), aes(x = Estimate)) +
   geom_histogram(fill = "chartreuse4", bins = 29) +
@@ -677,6 +686,9 @@ est + c(-1, 1) * qnorm(0.975) * sd(boot)
 
 # Percentile Bootstrap CI
 quantile(boot, probs = c(0.025, 0.975))
+# there exist improved versions (boot package), with improved coverage
+# especially if the sample is small -> important for empirical research
+# but the concept ist the same
 ```
 
 **Comment:** The two Bootstrap CIs are similar, but quite different from the normal confidence interval. In this situation, it is difficult to say which interval is the best.
@@ -723,10 +735,13 @@ boxplot(y ~ x, col = "chartreuse4", varwidth = TRUE)
 t.test(y ~ x, var.equal = TRUE)
 
 # Calculate p value "by hand" (why multiply with 2?)
+# we test it two-sided
 2 * (1 - pt(abs(-2.3297), df = m + n - 2))
 ```
 
 **Comment:** The sample mean is clearly larger in group B than in group A. What can we say about the true difference $\theta$ between corresponding population means? The t-test gives a p value of 0.023. At the 5% significance level, we can therefore reject the null hypothesis of equal population means.
+
+Never claim: H_0 is true, only the other way around (as in the courthouse)
 
 ### Tests for association
 
@@ -774,21 +789,29 @@ y2 <- rexp(n, 1 / 2)
 y <- c(y1, y2)
 x <- rep(c("A", "B"), times = c(m, n))
 
+# function of two arguments (easier to shuffle one of them)
 statistic <- function(x, y) {
+  # easier to calculate the p value afterwards if we use the abs(.)
+  # no need for standardization
   abs(mean(y[x == "B"]) - mean(y[x == "A"]))
 }
 
 # Calculate approximate null distribution
 B <- 1e4
+# replace is false -> sample just shuffles
 perm_dist <- replicate(B, statistic(sample(x), y))
 
 # p value
+# just apply the definition
+# since the distributions are discrete, >= or > is important here!
 mean(perm_dist >= statistic(x, y))
+# -> p value significant
 
 # Via "coin" package
 library(coin)
 
 independence_test(y ~ factor(x), distribution = approximate(nresample = 10000))
+# does almost the same
 ```
 
 **Comment:** Our permutation test gives very similar results to the one in the professional package "coin". They are also similar to the parametric version (see last example). In all cases, we can reject the null hypothesis of no true mean difference at the 5% level.
@@ -796,6 +819,7 @@ independence_test(y ~ factor(x), distribution = approximate(nresample = 10000))
 According to the following figure, $B = 10000$ Monte-Carlo-samples seem large enough: The p values stabilizes relatively quickly.
 
 ```{r}
+# cumulative sum, e.g. cumsum(1:10)
 successive_pvalues <- cumsum(perm_dist >= statistic(x, y)) / (1:B)
 plot(successive_pvalues, pch = ".")
 grid()
@@ -833,6 +857,7 @@ statistic <- function(x, y) {
 }
 
 # Simulation
+# snippet to display a progress bar
 set.seed(20)
 pb <- txtProgressBar(max = nsim, style = 3)
 if (FALSE) {  # Set to TRUE to rerun
@@ -859,8 +884,13 @@ if (FALSE) {  # Set to TRUE to rerun
 # Type 1 error
 (type_1_error <- readRDS("simulation/type_1_error.rds"))
 
+# always slightly larger than 5% (right-skewed distribution?), Welch is the worst, Student is the best
+# not so far away
+
 # Power under a mean shift of 1
 (Power <- readRDS("simulation/Power.rds"))
+# here Welch is the best
+# but all test are quite good
 ```
 
 **Comment**: In this situation, all tests are somewhat anti-conservative regarding Type 1 error. At the cost of a slightly higher Type 1 error, Welch's t-test has clearly the highest power. The permutation test performs somewhere in the middle.
@@ -884,10 +914,11 @@ Let's test the alternative hypothesis that the values in one sample tend to be l
 ```{r}
 library(withr)
 
+# small dataset
 y1 <- c(1, 1, 1, 2, 3, 4, 5)
 y2 <- c(4, 5, 5, 5, 6, 7, 8, 10)
 
-# Long form
+# Long form (stacked)
 y <- c(y1, y2)
 x <- rep(c("A", "B"), times = c(length(y1), length(y2)))
 
@@ -896,11 +927,15 @@ wilcox.test(y ~ x)$p.value
 
 # Permutation test
 statistic <- function(x, y) {
+  # only difference: we replace y with the rank
   r <- rank(y)
   abs(mean(r[x == "B"]) - mean(r[x == "A"]))
   # Could also use Wilcoxon's rank-sum statistic
 }
 
+# so we set the random seed only locally
+# after this, the seed is resetted to the value before
+# setseed has an effect on any line of code after it!
 with_seed(
   38,
   perm_dist <- replicate(1e4, statistic(sample(x), y))

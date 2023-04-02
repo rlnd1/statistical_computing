@@ -1019,6 +1019,7 @@ summary(fit)
 
 # Bias on original scale?
 mean(predict(fit, type = "response")) / mean(dataCar$numclaims) - 1
+# mean does exactly match -> no bias
 ```
 
 **Comments**
@@ -1307,9 +1308,12 @@ summary(fit)
 h2o.init(min_mem_size = "6G")
 
 # Copy data to cluster
+# data.table -> to h20 (in production: read parquet file into h20)
+# not so logical
 h2o_df <- as.h2o(df[, c(x, y), with = FALSE])
 
 # Calculations are all done in Java
+# crazy! almost instantly -> approximate values (quantiles + median need n*log(n) since we need sorted data, min, max -> linear)
 summary(h2o_df)
 # 
 #  log_distance       weekday    pu_hour    pu_loc         log_duration   
@@ -1326,6 +1330,8 @@ system.time( # 5 s
   )
 )
 fit_h2o
+
+# we have a progress bar, nice!
 
 # Partial output (pu_loc values are different due to a different reference category)
 # Coefficients: glm coefficients
@@ -1383,6 +1389,7 @@ library(tidyverse)
 diamonds <- mutate_if(diamonds, is.ordered, factor, ordered = FALSE)
 ```
 
+
 2.  Try to improve the model from Exercise 1 by adding interactions
     between our main predictor "carat" and "color", between "carat" and
     "cut", and also between "carat" and "clarity". Why could this make
@@ -1400,6 +1407,52 @@ diamonds <- mutate_if(diamonds, is.ordered, factor, ordered = FALSE)
     coefficients with those of a linear regression having the same
     covariates, but using "log(price)" as response. Calculate the
     relative bias of the average prediction. Why isn't it 0?
+
+the color, the lower the price
+the better the cut, the higher the price
+the better the clarity, the higher the price
+
+good model? 
+depends: effects point all in the right direction, a lot of significant cov.
+
+relative thinking is missing (fixed 200 CHF discount color is not realistic)
+
+2. Try to improve the model from Exercise 1 by adding interactions between our main predictor "carat" and "color", between "carat" and "cut", and also between "carat" and "clarity". Why could this make sense? How many additional parameters are required? How does the RMSE react?
+
+carat * (color + cut + clarity)
+
+more parameters
+if all parameters in reference carat, one carat more = + 5000 chf
+interpretation is a bit more tedious. what is the reference category?
+if not in reference category: look at the corresponding interaction too
+
+is it worth to sacrifice the simplicity of the additive model?
+
+RMSE gets better, but we estimate a lot of additional parameters
+R^2 improved too, 0.93 not so bad
+
+
+3. In the regression in Exercise 1, represent "carat" by a restricted cubic spline with four knots. What is a restricted cubic spline (check on the internet)? How much better does the RMSE get? Visualize the effect of "carat". Hint: Restricted cubic splines are available in the R package "splines". 
+
+splines is already installed by default
+
+cubic polynomials between two knots
+and then another polynomials
+we may set the knots manually or let the program use quantiles
+
+parameters: unrestricted knots * degree of spline function
+in restricted: linear with 1 knot: 2 parameter (always one parameter more than knots)
+so in our case: 5 parameters
+
+R^2 a bit smaller than before
+
+ns coefficients hard to read
+
+only a single covariate is in natural splines
+
+prediction for carat: quite straight line -> not so much better than classic linear model
+
+4. Fit a Gamma regression with log-link to explain diamond prices by "log(carat)", "color", "cut", and "clarity". Compare the coefficients with those of a linear regression having the same covariates, but using "log(price)" as response. Calculate the relative bias of the average prediction. Why isn't it 0?
 
 5.  Fit the Gamma GLM of Exercise 4 with H2O, optionally replacing the
     data preparation with "data.table". Do you get the same results?

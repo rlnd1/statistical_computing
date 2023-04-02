@@ -202,15 +202,74 @@ CI is not for the estimate, but for the true (unknown) parameter!
 ## 4
 
 Here, we study a test on Spearman's rank correlation.
-a.
-What is Spearman's rank correlation?
-b.
-Write a function `spearman_test2(x, y, B = 10000)` that calculates a one-sided permutation p value for the null hypothesis of no positive monotonic association.
+a. What is Spearman's rank correlation?
+Coefficient that assess the correlation of a sample. Instead of directly compare the observation, the ranks of the observations are considered. Altough some information is lost, this procedure is more robust against outliers, ... .
+
+b. Write a function `spearman_test2(x, y, B = 10000)` that calculates a one-sided permutation p value for the null hypothesis of no positive monotonic association.
 I.e., you want to show the alternative hypothesis that the true rank correlation is positive.
-c.
-Use a simulated example to compare with the corresponding p values from the "coin" package, and also using `stats::cor.test(x, y, method = "s", method = "greater")`.
+
+```{r}
+spearman_coeff <- function(x, y) {
+  n <- length(x)
+  r_x <- rank(x)
+  r_y <- rank(y)
+  
+  sd_x <- sqrt(1/n * sum((r_x - mean(r_x))^2))
+  sd_y <- sqrt(1/n * sum((r_y - mean(r_y))^2))
+  
+  1/n * (sum(r_x * r_y - mean(r_x) * mean(r_y))) / (sd_x * sd_y)
+}
+
+spearman_test2 <- function(x, y, B = 10000) {
+  #rs_observed <- cor(x, y, method = "spearman")
+  rs_observed <- spearman_coeff(x, y)
+  
+  # Initialize a vector to store the permuted rs values
+  rs_permuted <- rep(NA, B)
+  
+  # Perform B permutations
+  for (i in 1:B) {
+    # Permute the y values
+    y_permuted <- sample(y)
+    # Calculate the Spearman rank correlation coefficient for the permuted data
+    rs_permuted[i] <- cor(x, y_permuted, method = "spearman")
+  }
+  
+  # Calculate the p-value as the proportion of permuted rs values that are at least as extreme as the observed rs value
+  p_value <- sum(abs(rs_permuted) >= abs(rs_observed))/B
+  
+  p_value
+}
+```
+
+
+```{r}
+x <- c(10, 20, 30, 40, 50)
+y <- c(20, 15, 25, 35, 30)
+spearman_test2(x,y)
+```
+
+c.Use a simulated example to compare with the corresponding p values from the "coin" package, and also using `stats::cor.test(x, y, method = "s", method = "greater")`.
+
+```{r}
+x <- rnorm(1000, mean = 1)
+y <- runif(1000, min = 1, max = 2) * x # y is monotonically dependent on x (if x_1 < x_2 => y_1 < y_2)
+
+spearman_test2(x, y)
+stats::cor.test(x, y, method = "spearman", alternative = "greater")
+```
+
+
+```{r}
+x <- rnorm(1000, mean = 1)
+y <- rnorm(1000, mean = 100)
+
+spearman_test2(x, y)
+stats::cor.test(x, y, method = "spearman", alternative = "greater")
+```
 
 ## 5
+
 
 In the situation of Exercise 4: Use simulation to compare your approach with `stats::cor.test()` regarding... a.
 ... Type 1 error?

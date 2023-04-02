@@ -16,6 +16,8 @@ bibliography: biblio.bib
 link-citations: yes
 editor_options: 
   chunk_output_type: console
+  markdown: 
+    wrap: 72
 knit: (function(input, ...) {rmarkdown::render(input, output_dir = "docs")})
 ---
 
@@ -32,94 +34,139 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-This chapter on linear models is the starting point for the part "Statistical ML in Action". We will first outline this part. Then, we will revisit linear regression, followed by one of its most important generalizations: the generalized linear model (GLM). In the last section, we will learn about technologies for modeling large data.
+This chapter on linear models is the starting point for the part
+"Statistical ML in Action". We will first outline this part. Then, we
+will revisit linear regression, followed by one of its most important
+generalizations: the generalized linear model (GLM). In the last
+section, we will learn about technologies for modeling large data.
 
 ## Statistical ML in Action
 
 The remaining chapters
 
-3. Linear Models
-4. Model Selection and Validation
-5. Trees
-6. Neural Nets
+3.  Linear Models
+4.  Model Selection and Validation
+5.  Trees
+6.  Neural Nets
 
-are dedicated to Machine Learning (ML). 
+are dedicated to Machine Learning (ML).
 
 ML can be viewed as a collection of statistical algorithms used to
 
-- predict values (supervised ML) or to
-- investigate data structure (unsupervised ML).
+-   predict values (supervised ML) or to
+-   investigate data structure (unsupervised ML).
 
-Our focus is on supervised ML. Depending on whether we are predicting numbers or classes, we speak of regression or classification.
+Our focus is on supervised ML. Depending on whether we are predicting
+numbers or classes, we speak of regression or classification.
 
-Most examples will be based on the `diamonds` and the `dataCar` datasets from the first chapter. Additionally, we will work with a large data set containing information about many millions taxi trips in New York City in January 2018. Each row represents a taxi trip. The columns represent information like distance or start and end time. In the last section, "Modeling Large Data", you will find the download link for this data set.
+Most examples will be based on the `diamonds` and the `dataCar` datasets
+from the first chapter. Additionally, we will work with a large data set
+containing information about many millions taxi trips in New York City
+in January 2018. Each row represents a taxi trip. The columns represent
+information like distance or start and end time. In the last section,
+"Modeling Large Data", you will find the download link for this data
+set.
 
-The material of this part is based on our [online lecture](https://github.com/mayer79/ml_lecture).
+The material of this part is based on our [online
+lecture](https://github.com/mayer79/ml_lecture).
 
 ## Setup
 
-Our general setup is as follows: a distributional property $T$ of a response $Y$ should be approximated by a model $f: \boldsymbol x\in \mathbb R^p \mapsto \mathbb R$ of a $p$-dimensional feature vector $\boldsymbol X = (X^{(1)}, \dots, X^{(p)})$ with value $\boldsymbol x = (x^{(1)}, \dots, x^{(p)}) \in \mathbb R^p$, i.e.,
-$$
+Our general setup is as follows: a distributional property $T$ of a
+response $Y$ should be approximated by a model
+$f: \boldsymbol x\in \mathbb R^p \mapsto \mathbb R$ of a $p$-dimensional
+feature vector $\boldsymbol X = (X^{(1)}, \dots, X^{(p)})$ with value
+$\boldsymbol x = (x^{(1)}, \dots, x^{(p)}) \in \mathbb R^p$, i.e., $$
   T(Y\mid \boldsymbol X = \boldsymbol x) \approx f(\boldsymbol x).
-$$
-For brevity, we write $T(Y\mid \boldsymbol X = \boldsymbol x) = T(Y\mid \boldsymbol x)$.
-Examples of $T$ are the expectation $\mathbb E$, or a quantile $q_\alpha$. The model $f$ is then estimated by $\hat f$ from the training data by minimizing some objective function typically of the form
-$$
+$$ For brevity, we write
+$T(Y\mid \boldsymbol X = \boldsymbol x) = T(Y\mid \boldsymbol x)$.
+Examples of $T$ are the expectation $\mathbb E$, or a quantile
+$q_\alpha$. The model $f$ is then estimated by $\hat f$ from the
+training data by minimizing some objective function typically of the
+form $$
   Q(f) = \sum_{i = 1}^n L(y_i, f(\boldsymbol x_i)) + \lambda \Omega(f),
-$$
-where
+$$ where
 
-- $L$ is a loss function relevant for estimating $T$, e.g., the squared error $L(y, z) = (y - z)^2$ for estimation of the expectation,
-- $1 \le i \le n$ are the observations in the dataset considered,
-- $\lambda \Omega(f)$ is an optional penalty to reduce overfitting,
-- $\boldsymbol y = (y_1, \dots, y_n)^T$ are the $n$ observed values of $Y$,
-- $\boldsymbol{\hat y} = (\hat y_1, \dots, \hat y_n)^T$ is the vector of predicted or fitted values, i.e., $\hat y_i = \hat f(\boldsymbol x_i)$,
-- $\boldsymbol x_1, \dots, \boldsymbol x_n$ are the feature vectors corresponding to the $n$ observations. Consequently, $x_i^{(j)}$ denotes the value of the $j$-th feature of the $i$-th observation, and $\boldsymbol x^{(j)} = (x^{(j)}_1, \dots, x^{(j)}_n)^T$ are the observed values of feature $X^{(j)}$.
+-   $L$ is a loss function relevant for estimating $T$, e.g., the
+    squared error $L(y, z) = (y - z)^2$ for estimation of the
+    expectation,
+-   $1 \le i \le n$ are the observations in the dataset considered,
+-   $\lambda \Omega(f)$ is an optional penalty to reduce overfitting,
+-   $\boldsymbol y = (y_1, \dots, y_n)^T$ are the $n$ observed values of
+    $Y$,
+-   $\boldsymbol{\hat y} = (\hat y_1, \dots, \hat y_n)^T$ is the vector
+    of predicted or fitted values, i.e.,
+    $\hat y_i = \hat f(\boldsymbol x_i)$,
+-   $\boldsymbol x_1, \dots, \boldsymbol x_n$ are the feature vectors
+    corresponding to the $n$ observations. Consequently, $x_i^{(j)}$
+    denotes the value of the $j$-th feature of the $i$-th observation,
+    and $\boldsymbol x^{(j)} = (x^{(j)}_1, \dots, x^{(j)}_n)^T$ are the
+    observed values of feature $X^{(j)}$.
 
-Once found, $\hat f$ serves as our prediction function that can be applied to new data. In addition, we can examine the structure of $\hat f$ to gain insight into the relationship between response and covariates: 
+Once found, $\hat f$ serves as our prediction function that can be
+applied to new data. In addition, we can examine the structure of
+$\hat f$ to gain insight into the relationship between response and
+covariates:
 
-- What variables are especially important? 
-- How do they influence the response?
+-   What variables are especially important?
+-   How do they influence the response?
 
-**Remarks** 
+**Remarks**
 
-- Other terms for "response variable" are "output", "target" or "dependent variable". Other terms for "covariate" are "input", "feature", "independent variable" or "predictor".
-- Even if many of the concepts covered in this lecture also work for classification settings with more than two classes, we focus on regression and binary classification.
+-   Other terms for "response variable" are "output", "target" or
+    "dependent variable". Other terms for "covariate" are "input",
+    "feature", "independent variable" or "predictor".
+-   Even if many of the concepts covered in this lecture also work for
+    classification settings with more than two classes, we focus on
+    regression and binary classification.
 
 # Linear Regression
 
-In order to get used to the terms mentioned above, we will look at the mother of all supervised learning algorithms: (multiple) linear regression. It was first published by Adrien-Marie Legendre in 1805 and is still very frequently used thanks to its simplicity, interpretability, and flexibility. It further serves as a simple benchmark for more complex algorithms and is the starting point for extensions like the generalized linear model.
+In order to get used to the terms mentioned above, we will look at the
+mother of all supervised learning algorithms: (multiple) linear
+regression. It was first published by Adrien-Marie Legendre in 1805 and
+is still very frequently used thanks to its simplicity,
+interpretability, and flexibility. It further serves as a simple
+benchmark for more complex algorithms and is the starting point for
+extensions like the generalized linear model.
 
 ## Model equation
 
-Linear regression postulates the model equation
-$$
+Linear regression postulates the model equation $$
   \mathbb E(Y \mid \boldsymbol x) = f(\boldsymbol x) = \beta_o + \beta_1 x^{(1)} + \dots + \beta_p x^{(p)},
-$$
-where $(\beta_o, \beta_1, \dots, \beta_p) \in \mathbb R^{p+1}$ is the parameter vector to be estimated from the data.
+$$ where $(\beta_o, \beta_1, \dots, \beta_p) \in \mathbb R^{p+1}$ is the
+parameter vector to be estimated from the data.
 
-The model equation of the linear regression relates the covariates to the expected response $\mathbb E(Y\mid \boldsymbol x)$ by a *linear* formula in the parameters $\beta_o, \dots, \beta_p$. The additive constant $\beta_o$ is called the *intercept*. The parameter $\beta_j$ tells us by how much $Y$ is expected to change when the value of feature $X^{(j)}$ is increased by 1, **keeping all other covariates fixed** ("Ceteris Paribus"). The parameter $\beta_j$ is called *effect* of $X^{(j)}$ on the expected response.
+The model equation of the linear regression relates the covariates to
+the expected response $\mathbb E(Y\mid \boldsymbol x)$ by a *linear*
+formula in the parameters $\beta_o, \dots, \beta_p$. The additive
+constant $\beta_o$ is called the *intercept*. The parameter $\beta_j$
+tells us by how much $Y$ is expected to change when the value of feature
+$X^{(j)}$ is increased by 1, **keeping all other covariates fixed**
+("Ceteris Paribus"). The parameter $\beta_j$ is called *effect* of
+$X^{(j)}$ on the expected response.
 
-A linear regression with just one covariate $X$ is called a *simple* linear regression with equation 
-$$
+A linear regression with just one covariate $X$ is called a *simple*
+linear regression with equation $$
   \mathbb E(Y \mid x) = \alpha + \beta x.
 $$
 
 ## Least-squares
 
-The optimal $\hat f$ to estimate $f$ is found by minimizing as objective function the sum of squared *prediction errors* (*residuals*)
-$$
+The optimal $\hat f$ to estimate $f$ is found by minimizing as objective
+function the sum of squared *prediction errors* (*residuals*) $$
   \sum_{i=1}^n e_i^2 = \sum_{i=1}^n (y_i - \hat y_i)^2.
-$$
-Remember: $y_i$ is the observed response of the $i$th data row and $\hat y_i$ its prediction (or *fitted value*).
+$$ Remember: $y_i$ is the observed response of the $i$th data row and
+$\hat y_i$ its prediction (or *fitted value*).
 
-Once the model is fitted, we can use the coefficients $\hat\beta_o, \dots, \hat\beta_p$ to make predictions and to study empirical effects of the covariates on the expected response.
+Once the model is fitted, we can use the coefficients
+$\hat\beta_o, \dots, \hat\beta_p$ to make predictions and to study
+empirical effects of the covariates on the expected response.
 
 ### Example: Simple linear regression
 
-To discuss the typical output of a linear regression, we will now model diamond prices by size.
-The model equation is
-$$
+To discuss the typical output of a linear regression, we will now model
+diamond prices by size. The model equation is $$
   \mathbb E(\text{price} \mid \text{carat}) = \alpha + \beta \cdot \text{carat}.
 $$
 
@@ -146,38 +193,64 @@ intercept + slope * 1.3
 
 **Comments**
 
-- **Regression coefficients:** The intercept $\alpha$ is estimated by $\hat \alpha = -2256$ and the effect of carat $\beta$ by $\hat \beta = 7756$ USD. This means that a 1 carat increase goes along with an average increase in price of 7756 USD. Similarly, we could say that a 0.1 increase in carat is associated with an increase in the price of 775.6 USD.
-- **Regression line:** For a simple linear regression, the estimated regression coefficients $\hat \alpha$ and $\hat \beta$ can be visualized as a regression line. The latter represents the scatterplot as good as possible in the sense that the sum of squared vertical distances from the points to the line are minimal. The $y$-value at $x = 0$ equals $\hat \alpha = -2256$ and the slope of the line is $\hat \beta = 7756$.
-- **Predictions:** Model predictions are made by using the fitted model equation $-2256 + 7756 \cdot \text{carat}$. For a diamond of size 1.3 carat, we get $-2256 + 1.3 \cdot 7756 \approx 7827$. These values correspond to the values on the regression line.
+-   **Regression coefficients:** The intercept $\alpha$ is estimated by
+    $\hat \alpha = -2256$ and the effect of carat $\beta$ by
+    $\hat \beta = 7756$ USD. This means that a 1 carat increase goes
+    along with an average increase in price of 7756 USD. Similarly, we
+    could say that a 0.1 increase in carat is associated with an
+    increase in the price of 775.6 USD.
 
-- Intercept: -2256 meaning: a diamond of carat 0 has this value. Makes no sense! But we postulated this model.
-- Important: we minimize in Y-direction, not orthogonal to the regression line!
+-   **Regression line:** For a simple linear regression, the estimated
+    regression coefficients $\hat \alpha$ and $\hat \beta$ can be
+    visualized as a regression line. The latter represents the
+    scatterplot as good as possible in the sense that the sum of squared
+    vertical distances from the points to the line are minimal. The
+    $y$-value at $x = 0$ equals $\hat \alpha = -2256$ and the slope of
+    the line is $\hat \beta = 7756$.
 
+-   **Predictions:** Model predictions are made by using the fitted
+    model equation $-2256 + 7756 \cdot \text{carat}$. For a diamond of
+    size 1.3 carat, we get $-2256 + 1.3 \cdot 7756 \approx 7827$. These
+    values correspond to the values on the regression line.
+
+-   Intercept: -2256 meaning: a diamond of carat 0 has this value. Makes
+    no sense! But we postulated this model.
+
+-   Important: we minimize in Y-direction, not orthogonal to the
+    regression line!
 
 ## Quality of the model
 
-How good is a specific linear regression model? We may consider two aspects, namely 
+How good is a specific linear regression model? We may consider two
+aspects, namely
 
-- its predictive performance and 
-- how well its assumptions are satisfied.
+-   its predictive performance and
+-   how well its assumptions are satisfied.
 
 ### Predictive performance
 
-How accurate are the model predictions? That is, how well do the predictions match the observed response? In accordance with the least-squares approach, this is best quantified by the sum of squared prediction errors
-$$
+How accurate are the model predictions? That is, how well do the
+predictions match the observed response? In accordance with the
+least-squares approach, this is best quantified by the sum of squared
+prediction errors $$
   \sum_{i = 1}^n (y_i - \hat y_i)^2
-$$
-or, equivalently, by the *mean-squared error*
-$$
+$$ or, equivalently, by the *mean-squared error* $$
   \text{MSE} = \frac{1}{n}\sum_{i = 1}^n (y_i - \hat y_i)^2.
-$$
-To quantify the size of the typical prediction error on the same scale as $Y$, we can take the square-root of the MSE and study the *root-mean-squared error* (RMSE). Minimizing MSE also minimizes RMSE. 
+$$ To quantify the size of the typical prediction error on the same
+scale as $Y$, we can take the square-root of the MSE and study the
+*root-mean-squared error* (RMSE). Minimizing MSE also minimizes RMSE.
 
-Besides an *absolute* performance measure like the RMSE, we gain additional insights by studying a relative performance measure like the **R-squared**. It measures the relative decrease in MSE compared to the MSE of the "empty" or "null" model consisting only of an intercept. Put differently, the R-squared measures the proportion of variability of $Y$ explained by the covariates.
+Besides an *absolute* performance measure like the RMSE, we gain
+additional insights by studying a relative performance measure like the
+**R-squared**. It measures the relative decrease in MSE compared to the
+MSE of the "empty" or "null" model consisting only of an intercept. Put
+differently, the R-squared measures the proportion of variability of $Y$
+explained by the covariates.
 
 #### Example: Simple linear regression (continued)
 
-Let us calculate these performance measures for the simple linear regression above.
+Let us calculate these performance measures for the simple linear
+regression above.
 
 ```{r}
 # there are packages, but it is so simple
@@ -199,77 +272,146 @@ MSE_empty <- mse(diamonds$price, predict(empty_model, diamonds))
 
 **Comments**
 
-- **RMSE:** The RMSE is 1549 USD. This means that residuals (= prediction errors) are typically around 1549 USD. More specifically, using the empirical rule (and assuming normality), about $68\%$ of the observed values are within $\pm 1549$ USD of the predictions.
-- **R-squared:** The R-squared shows that about 85% of the price variability can be explained by variability in carat.
+-   **RMSE:** The RMSE is 1549 USD. This means that residuals (=
+    prediction errors) are typically around 1549 USD. More specifically,
+    using the empirical rule (and assuming normality), about $68\%$ of
+    the observed values are within $\pm 1549$ USD of the predictions.
+-   **R-squared:** The R-squared shows that about 85% of the price
+    variability can be explained by variability in carat.
 
 Look at two things: One relative measure and one absolute measure.
 
-Is model equation correct? No, it is just an approximation.
-Is it sufficiently close? For small diamonds its wrong, assumption not met, improve the model.
+Is model equation correct? No, it is just an approximation. Is it
+sufficiently close? For small diamonds its wrong, assumption not met,
+improve the model.
 
 ### Model assumptions
 
-The main assumption of linear regression is a **correctly specified model equation**
-$$
-	\mathbb E(Y \mid \boldsymbol x) = \beta_o + \beta_1 x^{(1)} + \dots + \beta_p x^{(p)}.
-$$
-This means that predictions are not systematically too high or too small for certain values of the covariates. 
- 
-How is this assumption checked in practice? In a simple regression setting, the points in the scatterplot should be located *around* the regression line for all covariate values. For a multiple linear regression, this translates to the empirical condition that residuals (differences between observed and fitted response) do not show bias if plotted against covariate values.
+The main assumption of linear regression is a **correctly specified
+model equation** $$
+    \mathbb E(Y \mid \boldsymbol x) = \beta_o + \beta_1 x^{(1)} + \dots + \beta_p x^{(p)}.
+$$ This means that predictions are not systematically too high or too
+small for certain values of the covariates.
 
-Additional assumptions like independence of rows, constant variance of the error term $\varepsilon$ in the equation
-$$
+How is this assumption checked in practice? In a simple regression
+setting, the points in the scatterplot should be located *around* the
+regression line for all covariate values. For a multiple linear
+regression, this translates to the empirical condition that residuals
+(differences between observed and fitted response) do not show bias if
+plotted against covariate values.
+
+Additional assumptions like independence of rows, constant variance of
+the error term $\varepsilon$ in the equation $$
   Y = f(\boldsymbol x) + \varepsilon
-$$
-and normal distribution of $\varepsilon$ guarantee optimality of the least-squares estimator $\hat \beta_o, \dots, \hat \beta_p$ and the correctness of inferential statistics (standard errors, p values, confidence intervals). In that case, we talk of the *normal linear model*. Its conditions are checked by studying *diagnostic plots*. We skip this part for brevity and since we are not digging into inferential statistics.
+$$ and normal distribution of $\varepsilon$ guarantee optimality of the
+least-squares estimator $\hat \beta_o, \dots, \hat \beta_p$ and the
+correctness of inferential statistics (standard errors, p values,
+confidence intervals). In that case, we talk of the *normal linear
+model*. Its conditions are checked by studying *diagnostic plots*. We
+skip this part for brevity and since we are not digging into inferential
+statistics.
 
 #### Example: Simple linear regression (continued)
 
-Looking at the scatter plot augmented with the regression line, we can see systematically too low (even negative!) predictions for very small diamonds. This indicates a misspecified model. Later we will see how to fix this.
+Looking at the scatter plot augmented with the regression line, we can
+see systematically too low (even negative!) predictions for very small
+diamonds. This indicates a misspecified model. Later we will see how to
+fix this.
 
 ## Typical problems
 
-In the following, we will list some problems that often occur in linear regression. We will only mention them without going into detail.
+In the following, we will list some problems that often occur in linear
+regression. We will only mention them without going into detail.
 
 ### Missing values
 
-Like many other ML algorithms, linear regression cannot handle missing values. Rows with missing responses can be safely omitted, while missing values in covariates should usually be handled. The simplest (often too naive) approach is to fill in missing values with a typical value such as the mean or the most frequent value.
+Like many other ML algorithms, linear regression cannot handle missing
+values. Rows with missing responses can be safely omitted, while missing
+values in covariates should usually be handled. The simplest (often too
+naive) approach is to fill in missing values with a typical value such
+as the mean or the most frequent value.
 
 ### Outliers
 
-Gross outliers in the covariates can distort the result of linear regression. Do not delete them, but try to reduce their effect by using logarithms or more robust regression techniques. Outliers in the response can also be problematic, especially for inferential statistics.
+Gross outliers in the covariates can distort the result of linear
+regression. Do not delete them, but try to reduce their effect by using
+logarithms or more robust regression techniques. Outliers in the
+response can also be problematic, especially for inferential statistics.
 
 ### Overfitting
 
-If too many parameters are used relative to the number of observations, the resulting model may *look* good but would not generalize well to new data. This is referred to as overfitting. A small amount of overfitting is not problematic. However, do not fit a model with $p=100$ parameters to a data set with only $n=200$ rows. The resulting model would be garbage. An $n/p$ ratio greater than 50 is usually safe for stable parameter estimation.
+If too many parameters are used relative to the number of observations,
+the resulting model may *look* good but would not generalize well to new
+data. This is referred to as overfitting. A small amount of overfitting
+is not problematic. However, do not fit a model with $p=100$ parameters
+to a data set with only $n=200$ rows. The resulting model would be
+garbage. An $n/p$ ratio greater than 50 is usually safe for stable
+parameter estimation.
 
 ### Collinearity
 
-When the association between two or more covariates is strong, their coefficients are difficult to interpret because the Ceteris Paribus clause is usually unnatural in such situations. For example, in a house price model, it is unnatural to examine the effect of an additional room while the living area remains unchanged. This is even more problematic for causally dependent covariates: Consider a model with covariates $X$ and $X^2$. It would certainly not make sense to examine the effect of $X$ while $X^2$ remains fixed. 
+When the association between two or more covariates is strong, their
+coefficients are difficult to interpret because the Ceteris Paribus
+clause is usually unnatural in such situations. For example, in a house
+price model, it is unnatural to examine the effect of an additional room
+while the living area remains unchanged. This is even more problematic
+for causally dependent covariates: Consider a model with covariates $X$
+and $X^2$. It would certainly not make sense to examine the effect of
+$X$ while $X^2$ remains fixed.
 
-Strong collinearity can be detected by looking at correlations across (numeric) covariates. It is mainly a problem when interpreting effects or for statistical inference of effects. Predictions or other "global" model characteristics like the R-squared are not affected.
+Strong collinearity can be detected by looking at correlations across
+(numeric) covariates. It is mainly a problem when interpreting effects
+or for statistical inference of effects. Predictions or other "global"
+model characteristics like the R-squared are not affected.
 
-Often, collinearity can be reduced by transforming the covariates so that the Ceteris Paribus clause becomes natural. For example, instead of using the number of rooms and the living area in a house price model, it might be helpful to represent the living area by the derived variable "living area per room".
+Often, collinearity can be reduced by transforming the covariates so
+that the Ceteris Paribus clause becomes natural. For example, instead of
+using the number of rooms and the living area in a house price model, it
+might be helpful to represent the living area by the derived variable
+"living area per room".
 
-Note: Perfectly collinear covariates (for example $X$ and $2X$) cannot be used for algorithmic reasons.
+Note: Perfectly collinear covariates (for example $X$ and $2X$) cannot
+be used for algorithmic reasons.
 
 ## Categorical covariates
 
-Since algorithms usually only understand numbers, categorical variables have to be encoded by numbers. The standard approach is called **one-hot-encoding** (OHE) and works as follows: Each level $x_k$ of the categorical variable $X$ gets its own binary **dummy** variable $D_k = \boldsymbol 1(X = x_k)$, indicating if $X$ has this particular value or not. In linear models, one of the dummy variables ($D_1$, say) needs to be dropped due to perfect collinearity (for each row, the sum of OHE variables is always 1). Its level is automatically being represented by the intercept. This variant of OHE is called **dummy coding**.
+Since algorithms usually only understand numbers, categorical variables
+have to be encoded by numbers. The standard approach is called
+**one-hot-encoding** (OHE) and works as follows: Each level $x_k$ of the
+categorical variable $X$ gets its own binary **dummy** variable
+$D_k = \boldsymbol 1(X = x_k)$, indicating if $X$ has this particular
+value or not. In linear models, one of the dummy variables ($D_1$, say)
+needs to be dropped due to perfect collinearity (for each row, the sum
+of OHE variables is always 1). Its level is automatically being
+represented by the intercept. This variant of OHE is called **dummy
+coding**.
 
-For our diamonds data set, OHE for the variable `color` looks as follows (the first column is the original categorical variable, the other columns are the dummy variables):
+For our diamonds data set, OHE for the variable `color` looks as follows
+(the first column is the original categorical variable, the other
+columns are the dummy variables):
 
 ![](figs/ohe.PNG)
 
 **Comments on categorical covariates**
 
-- **Interpretation:** Interpreting the regression coefficient $\beta_k$ of the dummy variable $D_k$ is nothing special: It tells us how much $\mathbb E(Y)$ changes when the dummy variable switches from 0 to 1. This amounts to switching from the reference category (the one without dummy) to category $k$.
-- **Integer encoding:** Ordinal categorical covariates are sometimes integer encoded for simplicity, i.e., each category is represented by an integer number. If such a linear representation does not make sense, adding polynomial terms (see later) can lead to a good compromise. 
-- **Small categories:** To reduced overfitting, small categories are sometimes combined into an "Other" level or added to the largest category (if this makes sense).
+-   **Interpretation:** Interpreting the regression coefficient
+    $\beta_k$ of the dummy variable $D_k$ is nothing special: It tells
+    us how much $\mathbb E(Y)$ changes when the dummy variable switches
+    from 0 to 1. This amounts to switching from the reference category
+    (the one without dummy) to category $k$.
+-   **Integer encoding:** Ordinal categorical covariates are sometimes
+    integer encoded for simplicity, i.e., each category is represented
+    by an integer number. If such a linear representation does not make
+    sense, adding polynomial terms (see later) can lead to a good
+    compromise.
+-   **Small categories:** To reduced overfitting, small categories are
+    sometimes combined into an "Other" level or added to the largest
+    category (if this makes sense).
 
 ### Example: Dummy coding
 
-Let us now extend the simple linear regression for diamond prices by adding dummy variables for the categorical covariate `color`.
+Let us now extend the simple linear regression for diamond prices by
+adding dummy variables for the categorical covariate `color`.
 
 ```{r}
 library(ggplot2)
@@ -291,33 +433,51 @@ summary(fit)
 
 **Comments**
 
-- **Slope:** Adding the covariate `color` has changed the slope of `carat` from 7756 in the simple linear regression to 8067. The effect of `carat` *adjusted* for `color` is thus 8067.
-- **Effects:** Each dummy variable of `color` has received its own coefficient. Switching from the reference color "D" to "E" is associated with an average price reduction of 94 USD. The effect of color "F" compared to color "D" is about $-80$ USD.
-- **Confounding:** In contrast to the unintuitive descriptive results seen before (worse colors tend to higher prices), worse colors are now associated with lower prices. Adjusting for carat has solved that mystery. It appears that diamond size had *confounded* the association between color and price. A regression model accounts for such confounding effects to a certain extent.
+-   **Slope:** Adding the covariate `color` has changed the slope of
+    `carat` from 7756 in the simple linear regression to 8067. The
+    effect of `carat` *adjusted* for `color` is thus 8067.
+-   **Effects:** Each dummy variable of `color` has received its own
+    coefficient. Switching from the reference color "D" to "E" is
+    associated with an average price reduction of 94 USD. The effect of
+    color "F" compared to color "D" is about $-80$ USD.
+-   **Confounding:** In contrast to the unintuitive descriptive results
+    seen before (worse colors tend to higher prices), worse colors are
+    now associated with lower prices. Adjusting for carat has solved
+    that mystery. It appears that diamond size had *confounded* the
+    association between color and price. A regression model accounts for
+    such confounding effects to a certain extent.
 
 ## Flexibility
 
-Linear regression is flexible regarding *how* variables are represented in the linear equation. Possibilities include
+Linear regression is flexible regarding *how* variables are represented
+in the linear equation. Possibilities include
 
-- using non-linear terms,
-- interactions, and
-- transformations, notably logarithmic responses.
+-   using non-linear terms,
+-   interactions, and
+-   transformations, notably logarithmic responses.
 
 These elements are very important for making realistic models.
 
 ### Non-linear terms
 
-Important numeric covariates can be represented by more than one parameter (= linear slope) to model more flexible and non-linear associations with the response. For example, the addition of a quadratic term allows curvature. The addition of a sufficient number of polynomial terms can approximate any smooth relationship. 
+Important numeric covariates can be represented by more than one
+parameter (= linear slope) to model more flexible and non-linear
+associations with the response. For example, the addition of a quadratic
+term allows curvature. The addition of a sufficient number of polynomial
+terms can approximate any smooth relationship.
 
-For example, the model equation for a cubic regression is
-$$
+For example, the model equation for a cubic regression is $$
   \mathbb E(Y \mid x) = \beta_0 + \beta_1 x + \beta_2 x^2 + \beta_3x^3.
-$$
-An alternative to polynomial terms are *regression splines*, i.e., piecewise polynomials. Using non-linear terms complicates the interpretation of regression coefficients. An option is to study predictions while sliding the covariate values over its range (systematic predictions).
+$$ An alternative to polynomial terms are *regression splines*, i.e.,
+piecewise polynomials. Using non-linear terms complicates the
+interpretation of regression coefficients. An option is to study
+predictions while sliding the covariate values over its range
+(systematic predictions).
 
 #### Example: Cubic regression
 
-How would a cubic regression approximate the relationship between diamond prices and carat?
+How would a cubic regression approximate the relationship between
+diamond prices and carat?
 
 The polynomial terms used for modeling look as follows:
 
@@ -339,22 +499,42 @@ ggplot(aes(x = carat, y = price)) +
 
 **Comments**
 
-- In the dense part (carats up to 2), the cubic polynomial seems to provide better results than a simple linear regression. No clear bias is visible.
-- Extrapolation to diamonds above 2 carat provides catastrophic results. Thus, be cautious with polynomial terms and extrapolation.
+-   In the dense part (carats up to 2), the cubic polynomial seems to
+    provide better results than a simple linear regression. No clear
+    bias is visible.
+-   Extrapolation to diamonds above 2 carat provides catastrophic
+    results. Thus, be cautious with polynomial terms and extrapolation.
 
 ### Interaction terms
 
-Once fitted, the effect of a covariate does not depend on the values of the other covariates. This is a direct consequence of the additivity of the model equation. The additivity assumption is sometimes too strict. E.g., a treatment effect might be larger for younger patients than for older. Or an extra 0.1 carat of diamond weight is worth more for a beautiful white diamond compared to an unspectacular yellow one. In such cases, adding *interaction terms* provides the necessary flexibility. Mathematically, an interaction term between covariates $X$ and $Z$ equals their product, where categorical covariates are first replaced by their dummy variables. Practically, it means that the effect $X$ depends on the value of $Z$. 
+Once fitted, the effect of a covariate does not depend on the values of
+the other covariates. This is a direct consequence of the additivity of
+the model equation. The additivity assumption is sometimes too strict.
+E.g., a treatment effect might be larger for younger patients than for
+older. Or an extra 0.1 carat of diamond weight is worth more for a
+beautiful white diamond compared to an unspectacular yellow one. In such
+cases, adding *interaction terms* provides the necessary flexibility.
+Mathematically, an interaction term between covariates $X$ and $Z$
+equals their product, where categorical covariates are first replaced by
+their dummy variables. Practically, it means that the effect $X$ depends
+on the value of $Z$.
 
 **Comments**
 
-- Adding interaction terms makes model interpretation difficult.
-- Interaction terms mean more parameters, thus there is a danger of overfitting. Finding the right interaction terms without introducing overfitting is difficult or even impossible.
-- Modern ML algorithms like neural networks and tree-based models automatically find interactions, even between more than two variables. This is one of their main strengths.
+-   Adding interaction terms makes model interpretation difficult.
+-   Interaction terms mean more parameters, thus there is a danger of
+    overfitting. Finding the right interaction terms without introducing
+    overfitting is difficult or even impossible.
+-   Modern ML algorithms like neural networks and tree-based models
+    automatically find interactions, even between more than two
+    variables. This is one of their main strengths.
 
 #### Example
 
-Let us now fit a linear regression for diamond prices with covariates `carat` and `color`, once without and once with interaction. We interpret the resulting models by looking at systematic predictions (sliding both carat and color over their range).
+Let us now fit a linear regression for diamond prices with covariates
+`carat` and `color`, once without and once with interaction. We
+interpret the resulting models by looking at systematic predictions
+(sliding both carat and color over their range).
 
 ```{r}
 library(tidyverse)
@@ -389,32 +569,41 @@ ggplot(to_plot, aes(x = carat, y = prediction, group = color, color = color)) +
 
 **Comments**
 
-- The left image shows an additive model: the slope of `carat` does not depend on the color. Similarly, the effect of `color` does not depend on the size. This is not very realistic, as the color effects are likely to be greater with large diamonds.
-- In the model with interactions (right image), different slopes and intercepts result for each color, as if we had performed a simple linear regression *per color*. The larger the diamonds, the larger the color effects.
-- The slopes are not very much different across colors, so the interaction effects are small.
+-   The left image shows an additive model: the slope of `carat` does
+    not depend on the color. Similarly, the effect of `color` does not
+    depend on the size. This is not very realistic, as the color effects
+    are likely to be greater with large diamonds.
+-   In the model with interactions (right image), different slopes and
+    intercepts result for each color, as if we had performed a simple
+    linear regression *per color*. The larger the diamonds, the larger
+    the color effects.
+-   The slopes are not very much different across colors, so the
+    interaction effects are small.
 
 ### Transformations of covariates
 
 Covariates are often transformed before entering the model:
 
-- Categorical covariates are dummy coded.
-- Strongly correlated covariates might be decorrelated.
-- Logarithms neutralize gross outliers.
+-   Categorical covariates are dummy coded.
+-   Strongly correlated covariates might be decorrelated.
+-   Logarithms neutralize gross outliers.
 
-Not surprisingly, coefficients explain how the *transformed* variables acts on the expected response. For a log-transformed covariate $X$, we can even interpret the coefficient regarding the **untransformed** $X$. In the model equation
-$$
+Not surprisingly, coefficients explain how the *transformed* variables
+acts on the expected response. For a log-transformed covariate $X$, we
+can even interpret the coefficient regarding the **untransformed** $X$.
+In the model equation $$
   \mathbb E(Y\mid x) = \alpha + \beta \log(x),
-$$
-we can say: A 1% increase in feature $X$ leads to an increase in $\mathbb E(Y\mid x)$ of about $\beta/100$. Indeed, we have
-$$
+$$ we can say: A 1% increase in feature $X$ leads to an increase in
+$\mathbb E(Y\mid x)$ of about $\beta/100$. Indeed, we have $$
   \mathbb E(Y\mid 101\% \cdot x) - \mathbb E(Y\mid x) = \alpha + \beta \log (1.01 \cdot x) - \alpha - \beta \log(x) \\ 
   = \beta \log\left(\frac{1.01 \cdot x}{x}\right)= \beta \log(1.01) \approx \beta/100.
-$$
-Thus, taking logarithms of covariates not only deals with outliers, it also offers us the possibility to talk about percentages.
+$$ Thus, taking logarithms of covariates not only deals with outliers,
+it also offers us the possibility to talk about percentages.
 
 #### Example: log(carat)
 
-What would a linear regression with logarithmic carat as single covariate give?
+What would a linear regression with logarithmic carat as single
+covariate give?
 
 (still a linear model with params alpha and beta)
 
@@ -446,47 +635,58 @@ ggplot(to_plot, aes(x = carat, y = price)) +
 
 ```
 
-**Comments** 
+**Comments**
 
-- Indeed, we have fitted a logarithmic relationship between carat and price. The scatterplots (on log-scale and back-transformed to original scale) reveal that this does not make much sense. The model looks wrong. Shouldn't we better take the logarithm of *price*?
-- As usual, we can say that a one-point increase in `log(carat)` leads to a expected price increase of 5836 USD.
-- Back-transformed, this amounts to saying that a $1\%$ increase in `carat` is associated with an average price increase of about $5836/100 = 60$ USD.
+-   Indeed, we have fitted a logarithmic relationship between carat and
+    price. The scatterplots (on log-scale and back-transformed to
+    original scale) reveal that this does not make much sense. The model
+    looks wrong. Shouldn't we better take the logarithm of *price*?
+-   As usual, we can say that a one-point increase in `log(carat)` leads
+    to a expected price increase of 5836 USD.
+-   Back-transformed, this amounts to saying that a $1\%$ increase in
+    `carat` is associated with an average price increase of about
+    $5836/100 = 60$ USD.
 
 ### Logarithmic response
 
-We have seen that taking logarithms not only reduces outlier effects in covariates but they also allow to think in percentages. What happens if we log-transform the response variable? The model of a simple linear regression would be
-$$
+We have seen that taking logarithms not only reduces outlier effects in
+covariates but they also allow to think in percentages. What happens if
+we log-transform the response variable? The model of a simple linear
+regression would be $$
   \mathbb E(\log(Y) \mid x) = \alpha + \beta x.
-$$  
-**Claim:** The effect $\beta$ tells us by how much *percentage* we can expect $Y$ to change when increasing the value of feature $X$ by 1. Thus, a logarithmic response leads to a *multiplicative* instead of an *additive* model.
+$$\
+**Claim:** The effect $\beta$ tells us by how much *percentage* we can
+expect $Y$ to change when increasing the value of feature $X$ by 1.
+Thus, a logarithmic response leads to a *multiplicative* instead of an
+*additive* model.
 
 **Proof**
 
-Assume for a moment that we can swap taking expectations and logarithms (disclaimer: we cannot). In that case, the model would be
+Assume for a moment that we can swap taking expectations and logarithms
+(disclaimer: we cannot). In that case, the model would be
 
 $$
   \log(\mathbb E(Y\mid x)) = \alpha + \beta x
-$$
-or, after exponentiation,
-$$
+$$ or, after exponentiation, $$
   \mathbb E(Y\mid x) = e^{\alpha + \beta x}.
-$$
-The additive effect of increasing $x$ by 1 would be
-$$
+$$ The additive effect of increasing $x$ by 1 would be $$
   \mathbb E(Y\mid x+1) - \mathbb E(Y\mid x) = e^{\alpha + \beta (x+1)} - e^{\alpha + \beta x} \\
   = e^{\alpha + \beta x}e^\beta - e^{\alpha + \beta x} = e^{\alpha + \beta x}(e^\beta - 1) = \mathbb E(Y\mid x)(e^\beta - 1).
-$$
-Dividing both sides by $\mathbb E(Y\mid x)$ gives
-$$
+$$ Dividing both sides by $\mathbb E(Y\mid x)$ gives $$
 \underbrace{\frac{\mathbb E(Y\mid x+1) - \mathbb E(Y\mid x)}{\mathbb E(Y\mid x)}}_{\text{Relative change in } \mathbb E(Y \mid x)} = e^\beta-1 \approx \beta = \beta \cdot 100\%.
-$$
-Indeed: A one point increase in feature $X$ is associated with a relative increase in $\mathbb E(Y\mid x)$ of about $\beta \cdot 100\%$.
+$$ Indeed: A one point increase in feature $X$ is associated with a
+relative increase in $\mathbb E(Y\mid x)$ of about $\beta \cdot 100\%$.
 
-Since expectations and logarithms cannot be swapped, the calculation is not 100% correct. One consequence of this imperfection is that predictions backtransformed to the scale of $Y$ are biased. One of the motivations of the generalized linear models GLM (see next section) will be to mend this problem in an elegant way.
+Since expectations and logarithms cannot be swapped, the calculation is
+not 100% correct. One consequence of this imperfection is that
+predictions backtransformed to the scale of $Y$ are biased. One of the
+motivations of the generalized linear models GLM (see next section) will
+be to mend this problem in an elegant way.
 
 #### Example: log(price)
 
-How would our simple linear regression look like with `log(price)` as response?
+How would our simple linear regression look like with `log(price)` as
+response?
 
 ```{r}
 library(tidyverse)
@@ -514,20 +714,28 @@ ggplot(to_plot, aes(x = carat, y = price)) +
   ggtitle("Original scale")
 ```
 
-**Comments** 
+**Comments**
 
-- **General impression:** The model looks fine until 1.8 carat (both on log-scale and original scale). For larger diamonds, the model is heavily biased.
-- **Interpretation on log-scale:** An increase in carat of 0.1 is associated with a log(price) increase of 0.197.
-- **Interpretation on original scale:** An increase in carat of 0.1 is associated with a price increase of about 20%.
-- **Predictions:** Predictions are obtained by exponentiating the result of the linear formula.
-- **R-squared:** About 85% of the variability in log(price) can be explained by carat.
-- **RMSE:** Typical prediction errors are in the range of 40%.
+-   **General impression:** The model looks fine until 1.8 carat (both
+    on log-scale and original scale). For larger diamonds, the model is
+    heavily biased.
+-   **Interpretation on log-scale:** An increase in carat of 0.1 is
+    associated with a log(price) increase of 0.197.
+-   **Interpretation on original scale:** An increase in carat of 0.1 is
+    associated with a price increase of about 20%.
+-   **Predictions:** Predictions are obtained by exponentiating the
+    result of the linear formula.
+-   **R-squared:** About 85% of the variability in log(price) can be
+    explained by carat.
+-   **RMSE:** Typical prediction errors are in the range of 40%.
 
 Not a good model yet. (above 1.8)
 
 #### Example: log(carat) and log(price)
 
-Using logarithms for either price or carat did not provide a satisfactory model yet. What about applying logarithms to both response and covariate at the same time?
+Using logarithms for either price or carat did not provide a
+satisfactory model yet. What about applying logarithms to both response
+and covariate at the same time?
 
 ```{r}
 library(tidyverse)
@@ -558,20 +766,30 @@ ggplot(to_plot, aes(x = carat, y = price)) +
 mean(exp(fitted(fit))) / mean(diamonds$price) - 1
 ```
 
-**Comments** 
+**Comments**
 
-- **General impression:** The model looks quite realistic, both on log-log and back-transformed scale. No obvious model biases are visible.
-- **Effect on log-scales**: An increase in log(carat) of 1 is associated with a log(price) increase of 1.67.
-- **Effect on original scales**: An increase in carat of 1% is associated with a price increase of about 1.67%. Such a log-log effect is called *elasticity*.
-- **R-squared:** About 93% of the variability in log(price) can be explained by log(carat). The model performs much better than the previous ones.
-- **RMSE:** Typical prediction errors are in the range of 26%.
-- **Bias:** While unbiased on the log scale, the predictions of this model are about 3% too small after exponentiation. This can be fixed by applying a corresponding bias correction factor.
+-   **General impression:** The model looks quite realistic, both on
+    log-log and back-transformed scale. No obvious model biases are
+    visible.
+-   **Effect on log-scales**: An increase in log(carat) of 1 is
+    associated with a log(price) increase of 1.67.
+-   **Effect on original scales**: An increase in carat of 1% is
+    associated with a price increase of about 1.67%. Such a log-log
+    effect is called *elasticity*.
+-   **R-squared:** About 93% of the variability in log(price) can be
+    explained by log(carat). The model performs much better than the
+    previous ones.
+-   **RMSE:** Typical prediction errors are in the range of 26%.
+-   **Bias:** While unbiased on the log scale, the predictions of this
+    model are about 3% too small after exponentiation. This can be fixed
+    by applying a corresponding bias correction factor.
 
-In log-space without outliers, R^2 is often better.
+In log-space without outliers, R\^2 is often better.
 
 ## Example: Diamonds improved
 
-To end the section on linear regression, we extend the log-log-example above by adding `color`, `cut` and `clarity` as categorical covariates.
+To end the section on linear regression, we extend the log-log-example
+above by adding `color`, `cut` and `clarity` as categorical covariates.
 
 ```{r}
 library(tidyverse)
@@ -584,119 +802,198 @@ summary(fit)
 
 **Comments**
 
-- **Effects:** All effects of the multiple linear regression look plausible.
-- **Interpretation:** For every % more carat, we can expect an increase in price of about 1.9% (keeping everything else fixed). Diamonds of the second best color "E" are about 5% cheaper than those of the best (keeping everything else fixed).
-- **R-squared:** About 98% of the variability in log-prices can be explained by our four covariates. Adding the three categorical covariates has considerably improved the precision of the model.
-- **RMSE:** The typical prediction error is about 13%.
-
+-   **Effects:** All effects of the multiple linear regression look
+    plausible.
+-   **Interpretation:** For every % more carat, we can expect an
+    increase in price of about 1.9% (keeping everything else fixed).
+    Diamonds of the second best color "E" are about 5% cheaper than
+    those of the best (keeping everything else fixed).
+-   **R-squared:** About 98% of the variability in log-prices can be
+    explained by our four covariates. Adding the three categorical
+    covariates has considerably improved the precision of the model.
+-   **RMSE:** The typical prediction error is about 13%.
 
 What does lm? Just type lm + Enter.
 
 C_Cdqrls: a C function (decomposition)
 
-In the C code, we call a FORTRAN call (linear algebra stuff -> FORTRAN is fast and advantageous for linear algebra)
-# Generalized Linear Model
+In the C code, we call a FORTRAN call (linear algebra stuff -\> FORTRAN
+is fast and advantageous for linear algebra) \# Generalized Linear Model
 
 The linear regression model has many extensions:
 
-- Quantile regression to model quantiles of the response instead of its expectation,
-- mixed-models to capture grouped data structures,
-- generalized least-squares to model time series data,
-- penalized regression, an extension to fight overfitting (LASSO, ridge regression, elastic net),
-- neural networks that automatically learn interactions and non-linearities (see later),
-- **the generalized linear model** that, e.g., allows to model binary response variables in a natural way,
-- ...
+-   Quantile regression to model quantiles of the response instead of
+    its expectation,
+-   mixed-models to capture grouped data structures,
+-   generalized least-squares to model time series data,
+-   penalized regression, an extension to fight overfitting (LASSO,
+    ridge regression, elastic net),
+-   neural networks that automatically learn interactions and
+    non-linearities (see later),
+-   **the generalized linear model** that, e.g., allows to model binary
+    response variables in a natural way,
+-   ...
 
-This section covers the generalized linear model (GLM). It was introduced in @nelder1972. 
+This section covers the generalized linear model (GLM). It was
+introduced in @nelder1972.
 
 ## Definition
 
-The model equation of a generalized linear model with monotone link function $g$ and inverse link $g^{-1}$ is assumed to satisfy:
-$$
+The model equation of a generalized linear model with monotone link
+function $g$ and inverse link $g^{-1}$ is assumed to satisfy: $$
   \mathbb E(Y \mid \boldsymbol x) = f(\boldsymbol x) = g^{-1}(\eta(\boldsymbol x)) = g^{-1}(\beta_o + \beta_1 x^{(1)} + \dots + \beta_p x^{(p)}),
-$$
-or similarly
-$$
+$$ or similarly $$
   g(\mathbb E(Y \mid \boldsymbol x)) = \eta(\boldsymbol x) = \beta_o + \beta_1 x^{(1)} + \dots + \beta_p x^{(p)},
-$$
-where $Y$ conditional on the covariates belongs to the so-called exponential dispersion family. The linear part $\eta$ of the model is called the *linear predictor*. 
+$$ where $Y$ conditional on the covariates belongs to the so-called
+exponential dispersion family. The linear part $\eta$ of the model is
+called the *linear predictor*.
 
 Thus, a GLM has three components:
 
-1. A linear function $\eta$ of the covariates (like in linear regression).
-2. The link function $g$. Its purpose is to map $\mathbb E(Y \mid \boldsymbol x)$ to the scale of the linear function. Or the other way round: The inverse link $g^{-1}$ maps the linear part to the scale of the response.
-3. A distribution of $Y$ conditional on the covariates. It implies the distribution-specific loss function $L$, called *unit deviance*, whose sum should be minimized over the model data. 
+1.  A linear function $\eta$ of the covariates (like in linear
+    regression).
+2.  The link function $g$. Its purpose is to map
+    $\mathbb E(Y \mid \boldsymbol x)$ to the scale of the linear
+    function. Or the other way round: The inverse link $g^{-1}$ maps the
+    linear part to the scale of the response.
+3.  A distribution of $Y$ conditional on the covariates. It implies the
+    distribution-specific loss function $L$, called *unit deviance*,
+    whose sum should be minimized over the model data.
 
 The following table lists some of the most commonly used GLMs.
 
-| Regression | Distribution| Range of $Y$          | Natural link            |  Unit deviance
-|:----------:|:-----------:|:---------------------:|:-----------------------:|:----------------------------------------------
-| Linear     | Normal      | $(-\infty, \infty)$   | Identity                | $(y - \hat y)^2$
-| Logistic   | Binary      | $\{0, 1\}$            | logit                   | $-2(y\log(\hat y) + (1-y) \log(1-\hat y))$
-| Poisson    | Poisson     | $[0, \infty)$         | log                     | $2(y \log(y / \hat y) - (y - \hat y))$
-| Gamma      | Gamma       | $(0, \infty)$         | $1/x$ (typical: log)    | $2((y - \hat y) / \hat y - \log(y / \hat y))$
-| Multinomial| Multinomial | $\{C_1, \dots, C_m\}$ | mlogit                  | $-2\sum_{j = 1}^m 1(y = C_j)\log(\hat y_j)$
+| Regression  | Distribution |     Range of $Y$      |     Natural link     | Unit deviance                                 |
+|:-----------:|:-----------:|:-----------:|:-----------:|:---------------------|
+|   Linear    |    Normal    |  $(-\infty, \infty)$  |       Identity       | $(y - \hat y)^2$                              |
+|  Logistic   |    Binary    |      $\{0, 1\}$       |        logit         | $-2(y\log(\hat y) + (1-y) \log(1-\hat y))$    |
+|   Poisson   |   Poisson    |     $[0, \infty)$     |         log          | $2(y \log(y / \hat y) - (y - \hat y))$        |
+|    Gamma    |    Gamma     |     $(0, \infty)$     | $1/x$ (typical: log) | $2((y - \hat y) / \hat y - \log(y / \hat y))$ |
+| Multinomial | Multinomial  | $\{C_1, \dots, C_m\}$ |        mlogit        | $-2\sum_{j = 1}^m 1(y = C_j)\log(\hat y_j)$   |
 
 ![](figs/GLM_distributions.PNG)
 
 **Some remarks**
 
-- To find predictions $\hat y$ on the scale of $Y$, one evaluates the linear predictor and then applies the inverse link $g^{-1}$.
-- Any monotone and smooth transformation can be used as link $g$. However, only the *natural/canonical* link has the relevant property of providing unbiased predictions on the scale of $Y$. Thus, one usually works with the natural link. Notable exception is the Gamma GLM, which is mostly applied with the log link because of the next property.
-- **Using a log link produces a multiplicative model for $\mathbb E(Y\mid \boldsymbol x)$.**
-- The binary case makes use of the relation $\mathbb E(Y) = \text{Prob(Y = 1)} = p$, i.e., modeling the expected response is the same as modeling the probability $p$ of having a 1.
-- The multinomial regression generalizes the binary case to more than two categories. While binary logistic regression predicts one single probability $\text{Prob}(Y=1)$, the multinomial model predicts a probability $\hat y_j$ for each of the $m$ categories.
-- The normal, Poisson and Gamma GLMs are special cases of the *Tweedie GLM*.
-- Half of the multinomial/binary unit deviance is the same as the cross-entropy, also called log loss.
+-   To find predictions $\hat y$ on the scale of $Y$, one evaluates the
+    linear predictor and then applies the inverse link $g^{-1}$.
+-   Any monotone and smooth transformation can be used as link $g$.
+    However, only the *natural/canonical* link has the relevant property
+    of providing unbiased predictions on the scale of $Y$. Thus, one
+    usually works with the natural link. Notable exception is the Gamma
+    GLM, which is mostly applied with the log link because of the next
+    property.
+-   **Using a log link produces a multiplicative model for**
+    $\mathbb E(Y\mid \boldsymbol x)$.
+-   The binary case makes use of the relation
+    $\mathbb E(Y) = \text{Prob(Y = 1)} = p$, i.e., modeling the expected
+    response is the same as modeling the probability $p$ of having a 1.
+-   The multinomial regression generalizes the binary case to more than
+    two categories. While binary logistic regression predicts one single
+    probability $\text{Prob}(Y=1)$, the multinomial model predicts a
+    probability $\hat y_j$ for each of the $m$ categories.
+-   The normal, Poisson and Gamma GLMs are special cases of the *Tweedie
+    GLM*.
+-   Half of the multinomial/binary unit deviance is the same as the
+    cross-entropy, also called log loss.
 
 ## Why do we need GLMs?
 
-The normal linear model allows us to model $\mathbb E(Y\mid \boldsymbol x)$ by an additive linear function. In principle, this would also work for 
+The normal linear model allows us to model
+$\mathbb E(Y\mid \boldsymbol x)$ by an additive linear function. In
+principle, this would also work for
 
-- binary responses (insurance claim yes/no, success yes/no, fraud yes/no, ...), 
-- count responses (number of insurance claims, number of adverse events, ...),
-- right-skewed responses (time durations, claim heights, prices, ...).
+-   binary responses (insurance claim yes/no, success yes/no, fraud
+    yes/no, ...),
+-   count responses (number of insurance claims, number of adverse
+    events, ...),
+-   right-skewed responses (time durations, claim heights, prices, ...).
 
-However, in such cases, an additive linear model equation is usually not very realistic. As such, the main assumption of the linear regression model is violated:
+However, in such cases, an additive linear model equation is usually not
+very realistic. As such, the main assumption of the linear regression
+model is violated:
 
-- Binary: A jump from 0.5 to 0.6 success probability seems less impressive than from 0.89 to 0.99. 
-- Count: A jump from an expected count of 2 to 3 seems less impressive than a jump from an expected count of 0.1 to 1.1. 
-- Right-skewed: A price jump from 1 Mio to 1.1 Mio is conceived as larger than a jump from 2 Mio to 2.1 Mio.
+-   Binary: A jump from 0.5 to 0.6 success probability seems less
+    impressive than from 0.89 to 0.99.
+-   Count: A jump from an expected count of 2 to 3 seems less impressive
+    than a jump from an expected count of 0.1 to 1.1.
+-   Right-skewed: A price jump from 1 Mio to 1.1 Mio is conceived as
+    larger than a jump from 2 Mio to 2.1 Mio.
 
-GLMs deal with such problems by using a suitable link function like the logarithm. At least for the first two examples, this could not be achieved by a linear regression with log response because $\log(0)$ is not defined.
+GLMs deal with such problems by using a suitable link function like the
+logarithm. At least for the first two examples, this could not be
+achieved by a linear regression with log response because $\log(0)$ is
+not defined.
 
 Further advantages of the GLM over the linear regression are:
 
-- Predictions are on the right scale: For instance, probabilities of a binary response are between 0 and 1 when using the logit link. With linear regression, they could be outside $[0, 1]$. Similarly, predictions of a Poisson or Gamma regression with log link are strictly positive, while they could be even negative with linear regression.
-- Inferential statistics are less inaccurate. For the linear regression, they depend on the equal variance assumption, which is violated for distributions like Poisson or Gamma.
+-   Predictions are on the right scale: For instance, probabilities of a
+    binary response are between 0 and 1 when using the logit link. With
+    linear regression, they could be outside $[0, 1]$. Similarly,
+    predictions of a Poisson or Gamma regression with log link are
+    strictly positive, while they could be even negative with linear
+    regression.
+-   Inferential statistics are less inaccurate. For the linear
+    regression, they depend on the equal variance assumption, which is
+    violated for distributions like Poisson or Gamma.
 
 ## Interpretation of effects
 
-The interpretation of model coefficients in GLMs is guided by the link function. (The expectations are always conditional).
+The interpretation of model coefficients in GLMs is guided by the link
+function. (The expectations are always conditional).
 
-- **Identity link:** As with linear regression: "A one-point increase in $X$ is associated with an increase in $\mathbb E(Y)$ of $\beta$, keeping everything else fixed". 
-- **Log link:** As with linear regression with log response: "A one-point increase in $X$ is associated with a relative increase in $\mathbb E(Y)$ of $e^{\beta}-1 \approx \beta \cdot 100\%$. The derivation is exactly as we have seen for linear regression, except that we now start with $\log(\mathbb E(Y))$ instead of $\mathbb E(\log(Y))$, making the former calculations mathematically sound. Using a GLM with log link is therefore the cleaner way to produce a multiplicative model for $\mathbb E(Y)$ than to log transform the response in a linear regression.
-- **Logit link:** Logistic regression uses the logit link
-$$
-  \text{logit}(p) = \log(\text{odds}(p)) = \log\left(\frac{p}{1-p}\right).
-$$
-It maps probabilities to the real line. The inverse logit ("sigmoidal transformation" or "logistic function") reverts this: It maps real values to the range from 0 to 1. Odds, i.e., the ratio of $p$ to $1-p$, is a concept borrowed from gambling: The *probability* of getting a "6" is 1/6 whereas the *odds* of getting a "6" is $1:5 = 0.2$. By definition, logistic regression is an additive model for the log-odds, thus a multiplicative model for the odds of getting a 1. Accordingly, the coefficients $e^\beta$ are called *odds ratios*. There is no easy way to interpret the coefficients on the original probability scale.
+-   **Identity link:** As with linear regression: "A one-point increase
+    in $X$ is associated with an increase in $\mathbb E(Y)$ of $\beta$,
+    keeping everything else fixed".
+-   **Log link:** As with linear regression with log response: "A
+    one-point increase in $X$ is associated with a relative increase in
+    $\mathbb E(Y)$ of $e^{\beta}-1 \approx \beta \cdot 100\%$. The
+    derivation is exactly as we have seen for linear regression, except
+    that we now start with $\log(\mathbb E(Y))$ instead of
+    $\mathbb E(\log(Y))$, making the former calculations mathematically
+    sound. Using a GLM with log link is therefore the cleaner way to
+    produce a multiplicative model for $\mathbb E(Y)$ than to log
+    transform the response in a linear regression.
+-   **Logit link:** Logistic regression uses the logit link $$
+    \text{logit}(p) = \log(\text{odds}(p)) = \log\left(\frac{p}{1-p}\right).
+    $$ It maps probabilities to the real line. The inverse logit
+    ("sigmoidal transformation" or "logistic function") reverts this: It
+    maps real values to the range from 0 to 1. Odds, i.e., the ratio of
+    $p$ to $1-p$, is a concept borrowed from gambling: The *probability*
+    of getting a "6" is 1/6 whereas the *odds* of getting a "6" is
+    $1:5 = 0.2$. By definition, logistic regression is an additive model
+    for the log-odds, thus a multiplicative model for the odds of
+    getting a 1. Accordingly, the coefficients $e^\beta$ are called
+    *odds ratios*. There is no easy way to interpret the coefficients on
+    the original probability scale.
 
 ![](figs/log_odds.png)
 
 ## Parameter estimation and deviance
 
-Parameters of a GLM are estimated by Maximum-Likelihood. This amounts to minimizing the (total) *deviance*, which equals the sum
-$$
+Parameters of a GLM are estimated by Maximum-Likelihood. This amounts to
+minimizing the (total) *deviance*, which equals the sum $$
   Q(f, D) = \sum_{(y_i, \boldsymbol x_i) \in D} L(y_i, f(\boldsymbol x_i))
-$$
-of the unit deviances over the model data $D$ (eventually weighted by case weights). For the normal linear model, the total deviance is equal to $n$ times the MSE. In fact, the total deviance plays the same role for GLMs as the MSE does for linear regression. Consequently, it is sometimes useful to consider as a relative performance measure the relative deviance improvement compared to an intercept-only model. For the normal linear regression model, this *Pseudo-R-squared* corresponds to the usual R-squared.
+$$ of the unit deviances over the model data $D$ (eventually weighted by
+case weights). For the normal linear model, the total deviance is equal
+to $n$ times the MSE. In fact, the total deviance plays the same role
+for GLMs as the MSE does for linear regression. Consequently, it is
+sometimes useful to consider as a relative performance measure the
+relative deviance improvement compared to an intercept-only model. For
+the normal linear regression model, this *Pseudo-R-squared* corresponds
+to the usual R-squared.
 
-**Outlook:** The loss functions used in the context of GLMs are used one-to-one as loss functions for other ML methods such as gradient boosting or neural networks. There, the "appropriate" loss function is chosen from the context. For example, if the response is binary, one usually chooses the binary cross-entropy as the loss function.
+**Outlook:** The loss functions used in the context of GLMs are used
+one-to-one as loss functions for other ML methods such as gradient
+boosting or neural networks. There, the "appropriate" loss function is
+chosen from the context. For example, if the response is binary, one
+usually chooses the binary cross-entropy as the loss function.
 
 ## Example: Poisson count regression
 
-We will now model the number of claims for the `insuranceData` by a Poisson GLM with its natural link function, the log. This ensures that we can interpret the effects of the covariates on a relative scale and that the predictions are positive. 
+We will now model the number of claims for the `insuranceData` by a
+Poisson GLM with its natural link function, the log. This ensures that
+we can interpret the effects of the covariates on a relative scale and
+that the predictions are positive.
 
 For simplicity, we do not take the exposure into account.
 
@@ -726,14 +1023,26 @@ mean(predict(fit, type = "response")) / mean(dataCar$numclaims) - 1
 
 **Comments**
 
-- An increase of 1 in `veh_value` increases the log of the expected count by 0.046. On the original count scale, this is an increase of approximately 4.6%. The exact effect is $e^{0.046388}-1 = 0.047 = 4.7\%$.
-- On average, male drivers produce about 1.6% less claims. 
-- The deviance 26629 is only 0.5% smaller than the one of the null model 26768. The predictive performance of this model is thus very low: having a claim is a highly random event that cannot be predicted on individual scale.
-- The predictions are unbiased on the original scale, a consequence of the fact that the log-link is the natural link for the Poisson model.
+-   An increase of 1 in `veh_value` increases the log of the expected
+    count by 0.046. On the original count scale, this is an increase of
+    approximately 4.6%. The exact effect is
+    $e^{0.046388}-1 = 0.047 = 4.7\%$.
+-   On average, male drivers produce about 1.6% less claims.
+-   The deviance 26629 is only 0.5% smaller than the one of the null
+    model 26768. The predictive performance of this model is thus very
+    low: having a claim is a highly random event that cannot be
+    predicted on individual scale.
+-   The predictions are unbiased on the original scale, a consequence of
+    the fact that the log-link is the natural link for the Poisson
+    model.
 
 ## Example: Logistic regression
 
-In order to illustrate logistic regression, we will model the binary variable "claim yes=1/no=0" of the claims data by a logistic regression. Its logit link ensures that predicted probabilities are between 0 and 1 and that covariates act in a multiplicative way on the odds of having a claim.
+In order to illustrate logistic regression, we will model the binary
+variable "claim yes=1/no=0" of the claims data by a logistic regression.
+Its logit link ensures that predicted probabilities are between 0 and 1
+and that covariates act in a multiplicative way on the odds of having a
+claim.
 
 ```{r}
 library(ggplot2)
@@ -756,71 +1065,137 @@ summary(fit)
 
 **Comments**
 
-- An increase of 1 in `veh_value` (10'000 USD) increases the log-odds of having a claim by 0.051. On the odds scale, this is an increase of approximately 5.1%. The exact calculation is $e^{0.05098}-1 = 0.052 = 5.2\%$. Thus we can say that for every additional 10'000 USD vehicle value, the odds of having a claim is increased by 5.2%.
-- The odds that a male produces a claim is about 1% smaller than for females. In order words, males are 1% less likely to have a claim than females.
-- The deviance 33'632 is only 0.4% smaller than the one of the null model (33'767).
+-   An increase of 1 in `veh_value` (10'000 USD) increases the log-odds
+    of having a claim by 0.051. On the odds scale, this is an increase
+    of approximately 5.1%. The exact calculation is
+    $e^{0.05098}-1 = 0.052 = 5.2\%$. Thus we can say that for every
+    additional 10'000 USD vehicle value, the odds of having a claim is
+    increased by 5.2%.
+-   The odds that a male produces a claim is about 1% smaller than for
+    females. In order words, males are 1% less likely to have a claim
+    than females.
+-   The deviance 33'632 is only 0.4% smaller than the one of the null
+    model (33'767).
 
 # Modeling Large Data
 
-In the 1970s, working with data as big as the diamond data would have been a major challenge. Today, primarily thanks to better hardware, we can solve linear regressions with millions of rows of data within seconds. Curiously, todays BLAS (Basic Linear Algebra Subprograms) or optimizers like BFGS have their roots in the 1970s.
+In the 1970s, working with data as big as the diamond data would have
+been a major challenge. Today, primarily thanks to better hardware, we
+can solve linear regressions with millions of rows of data within
+seconds. Curiously, todays BLAS (Basic Linear Algebra Subprograms) or
+optimizers like BFGS have their roots in the 1970s.
 
-While there are tools for working with data larger than RAM, our focus in this section is on in-memory computing. Thanks to cloud computing instances with 8 TB and more RAM, this is hardly a limitation, unless you are dealing with large image or video data.
+While there are tools for working with data larger than RAM, our focus
+in this section is on in-memory computing. Thanks to cloud computing
+instances with 8 TB and more RAM, this is hardly a limitation, unless
+you are dealing with large image or video data.
 
 The larger the data, the more we need to care about efficient
 
-- data storage,
-- data loading,
-- data preprocessing, and
-- model fitting.
+-   data storage,
+-   data loading,
+-   data preprocessing, and
+-   model fitting.
 
-In the following example, we will use Parquet for data storage, load the data via Arrow, preprocess it with R's "data.table", and fit a linear regression with H2O. These technologies share three important properties: They are free to use, open-source, and are (currently) state of the art.
+In the following example, we will use Parquet for data storage, load the
+data via Arrow, preprocess it with R's "data.table", and fit a linear
+regression with H2O. These technologies share three important
+properties: They are free to use, open-source, and are (currently) state
+of the art.
 
-Before going through the example, here a very brief introduction to the mentioned technologies.
+Before going through the example, here a very brief introduction to the
+mentioned technologies.
 
 ## Selected technologies
 
 ### Parquet
 
-[Apache Parquet](https://en.wikipedia.org/wiki/Apache_Parquet) is a column-oriented data storage format introduced in 2013. Unlike csv files, it uses various methods to compress data:
+[Apache Parquet](https://en.wikipedia.org/wiki/Apache_Parquet) is a
+column-oriented data storage format introduced in 2013. Unlike csv
+files, it uses various methods to compress data:
 
-- *Dictionary encoding:* Columns with a small number of unique values (e.g. canton names) are encoded using short integers. The mapping is stored as meta information.
-- *Run-length encoding:* Multiple occurences of a value are replaced by the value and the number of repetitions. Example: if "3.1", occurs 100 times after each other, only two values are needed for reconstruction: "3.1" and "100".
-- *Bit packing:* Multiple small integers are represented by a single integer.
+-   *Dictionary encoding:* Columns with a small number of unique values
+    (e.g. canton names) are encoded using short integers. The mapping is
+    stored as meta information.
+-   *Run-length encoding:* Multiple occurences of a value are replaced
+    by the value and the number of repetitions. Example: if "3.1",
+    occurs 100 times after each other, only two values are needed for
+    reconstruction: "3.1" and "100".
+-   *Bit packing:* Multiple small integers are represented by a single
+    integer.
 
-Besides compression, a big advantage compared to a csv file is that Parquet also stores meta information like: "the values represent strings" or "the values represent dates". A disadvantage is that the Parquet file is not human-readable. 
+Besides compression, a big advantage compared to a csv file is that
+Parquet also stores meta information like: "the values represent
+strings" or "the values represent dates". A disadvantage is that the
+Parquet file is not human-readable.
 
-Parquet files can be read via the (Py)Arrow library in R or Python. Many other technologies (Apache Spark, other database systems) also support working with Parquet files. We will get to know some of them later.
+Parquet files can be read via the (Py)Arrow library in R or Python. Many
+other technologies (Apache Spark, other database systems) also support
+working with Parquet files. We will get to know some of them later.
 
 ### Arrow
 
-[Apache Arrow](https://en.wikipedia.org/wiki/Apache_Arrow), available since 2016, is a language-independent standard for in-memory processing and transport of data. A core component of the Arrow library is its in-memory columnar data format (also called "Arrow"). For instance, an Arrow table in R has exactly the same representation in memory as in Python or Java, so there is no extra effort to transfer it from one system to the other.
+[Apache Arrow](https://en.wikipedia.org/wiki/Apache_Arrow), available
+since 2016, is a language-independent standard for in-memory processing
+and transport of data. A core component of the Arrow library is its
+in-memory columnar data format (also called "Arrow"). For instance, an
+Arrow table in R has exactly the same representation in memory as in
+Python or Java, so there is no extra effort to transfer it from one
+system to the other.
 
-Arrow is widely used in R and Python for reading and writing Parquet files. Furthermore, it plays well together with Apache Spark, a big data technology. We will meet Spark later.
+Arrow is widely used in R and Python for reading and writing Parquet
+files. Furthermore, it plays well together with Apache Spark, a big data
+technology. We will meet Spark later.
 
 ### R's data.table
 
-The [data.table](https://cran.r-project.org/web/packages/data.table/index.html) package is an R package for working with large data in an efficient way. It was released in 2006 as an extension of R's `data.frame` and performs most operations in-place, i.e. without making copies. "data.table" is famous for its fast csv reader/writer. One of its biggest successes was that its sort algorithm became part of base R. There is also a Python package "data.table", but it is less mature. At the time of writing, "Polars" seems to be a good alternative in Python.
+The
+[data.table](https://cran.r-project.org/web/packages/data.table/index.html)
+package is an R package for working with large data in an efficient way.
+It was released in 2006 as an extension of R's `data.frame` and performs
+most operations in-place, i.e. without making copies. "data.table" is
+famous for its fast csv reader/writer. One of its biggest successes was
+that its sort algorithm became part of base R. There is also a Python
+package "data.table", but it is less mature. At the time of writing,
+"Polars" seems to be a good alternative in Python.
 
 ### H2O
 
-H2O is an ML software bundle developed by [h2o.ai](https://h2o.ai/) for in-memory cluster computing. (A cluster consists of multiple independent computers.) H2O is written in Java, but offers wrappers for R and Python. Some of its algorithms:
+H2O is an ML software bundle developed by [h2o.ai](https://h2o.ai/) for
+in-memory cluster computing. (A cluster consists of multiple independent
+computers.) H2O is written in Java, but offers wrappers for R and
+Python. Some of its algorithms:
 
-- GLM
-- Generalized additive models (GAM)
-- Random forests
-- Feed-forward neural networks
-- Pricipal component analysis (PCR)
-- Autoencoders (dimension reduction via neural nets)
+-   GLM
+-   Generalized additive models (GAM)
+-   Random forests
+-   Feed-forward neural networks
+-   Pricipal component analysis (PCR)
+-   Autoencoders (dimension reduction via neural nets)
 
-H2O facilitates typical workflows like selecting models via cross-validation and putting final models into production. It is available since (around) 2014.
+H2O facilitates typical workflows like selecting models via
+cross-validation and putting final models into production. It is
+available since (around) 2014.
 
 ## Example: Taxi
 
-In this example, we retrieve information about all cab trips in New York City made by yellow cabs in January 2018. Download the data from the [official website](https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page) and save it in subfolder "taxi". It summarizes more than eight million trips. We will use the data to build a simple linear regression model that predicts trip duration based on start and end time, date, and pickup location.
+In this example, we retrieve information about all cab trips in New York
+City made by yellow cabs in January 2018. Download the data from the
+[official
+website](https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page)
+and save it in subfolder "taxi". It summarizes more than eight million
+trips. We will use the data to build a simple linear regression model
+that predicts trip duration based on start and end time, date, and
+pickup location.
 
-For a dataset of this size, we could easily have worked with csv data, dplyr and `lm()` instead of the Parquet/Arrow/data.table/H2O stack. However, imagine using all cab trips from all available months, which would result in a dataset with roughly 1 billion rows. In this case, the classic approach would be painfully slow.
+For a dataset of this size, we could easily have worked with csv data,
+dplyr and `lm()` instead of the Parquet/Arrow/data.table/H2O stack.
+However, imagine using all cab trips from all available months, which
+would result in a dataset with roughly 1 billion rows. In this case, the
+classic approach would be painfully slow.
 
-Computation time refers to a single run on an Intel i7 CPU with four physical cores.
+Computation time refers to a single run on an Intel i7 CPU with four
+physical cores.
 
 ```{r, eval=FALSE}
 library(arrow)
@@ -983,16 +1358,24 @@ fit_h2o
 
 **Comments**
 
-- Reading eight Mio data rows from Parquet is fast.
-- Data preparation with "data.table" is fast. Furthermore, it takes only about 0.1 seconds to calculate counts and average durations per pick-up location.
-- The results of `lm()` and `h2o.glm()` are identical (up to using a different reference level for the pickup location).
-- `h2o.glm()` is faster than `lm()`. One of the reasons is that its solvers do not require internal dummy encoding of the factors.
+-   Reading eight Mio data rows from Parquet is fast.
+-   Data preparation with "data.table" is fast. Furthermore, it takes
+    only about 0.1 seconds to calculate counts and average durations per
+    pick-up location.
+-   The results of `lm()` and `h2o.glm()` are identical (up to using a
+    different reference level for the pickup location).
+-   `h2o.glm()` is faster than `lm()`. One of the reasons is that its
+    solvers do not require internal dummy encoding of the factors.
 
 # Exercises
 
-1. Use the diamonds data to fit a linear regression to model expected price (without logarithm) as a function of "carat" (no log), "color", "clarity", and "cut". Interpret the output of the model. Does it make sense?
+1.  Use the diamonds data to fit a linear regression to model expected
+    price (without logarithm) as a function of "carat" (no log),
+    "color", "clarity", and "cut". Interpret the output of the model.
+    Does it make sense?
 
-For the first four exercises, start with this snippet to turn the ordered factors into unordered ones.
+For the first four exercises, start with this snippet to turn the
+ordered factors into unordered ones.
 
 ```{r}
 library(tidyverse)
@@ -1000,16 +1383,34 @@ library(tidyverse)
 diamonds <- mutate_if(diamonds, is.ordered, factor, ordered = FALSE)
 ```
 
-2. Try to improve the model from Exercise 1 by adding interactions between our main predictor "carat" and "color", between "carat" and "cut", and also between "carat" and "clarity". Why could this make sense? How many additional parameters are required? How does the RMSE react?
+2.  Try to improve the model from Exercise 1 by adding interactions
+    between our main predictor "carat" and "color", between "carat" and
+    "cut", and also between "carat" and "clarity". Why could this make
+    sense? How many additional parameters are required? How does the
+    RMSE react?
 
-3. In the regression in Exercise 1, represent "carat" by a restricted cubic spline with four knots. What is a restricted cubic spline (check on the internet)? How much better does the RMSE get? Visualize the effect of "carat". Hint: Restricted cubic splines are available in the R package "splines". 
+3.  In the regression in Exercise 1, represent "carat" by a restricted
+    cubic spline with four knots. What is a restricted cubic spline
+    (check on the internet)? How much better does the RMSE get?
+    Visualize the effect of "carat". Hint: Restricted cubic splines are
+    available in the R package "splines".
 
-4. Fit a Gamma regression with log-link to explain diamond prices by "log(carat)", "color", "cut", and "clarity". Compare the coefficients with those of a linear regression having the same covariates, but using "log(price)" as response. Calculate the relative bias of the average prediction. Why isn't it 0?
+4.  Fit a Gamma regression with log-link to explain diamond prices by
+    "log(carat)", "color", "cut", and "clarity". Compare the
+    coefficients with those of a linear regression having the same
+    covariates, but using "log(price)" as response. Calculate the
+    relative bias of the average prediction. Why isn't it 0?
 
-5. Fit the Gamma GLM of Exercise 4 with H2O, optionally replacing the data preparation with "data.table". Do you get the same results?
+5.  Fit the Gamma GLM of Exercise 4 with H2O, optionally replacing the
+    data preparation with "data.table". Do you get the same results?
 
 # Summary
 
-In this chapter, we have revisited multiple linear regression and some of its many aspects. Additionally, we met an important generalization of linear regression, namely the generalized linear model (GLM). It includes binary logistic regression and Poisson count regression as relevant special cases. In the last section, we met tools to work with large data.
+In this chapter, we have revisited multiple linear regression and some
+of its many aspects. Additionally, we met an important generalization of
+linear regression, namely the generalized linear model (GLM). It
+includes binary logistic regression and Poisson count regression as
+relevant special cases. In the last section, we met tools to work with
+large data.
 
 # References

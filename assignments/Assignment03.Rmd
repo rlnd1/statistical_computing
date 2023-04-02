@@ -1,0 +1,79 @@
+---
+title: "Assignment03"
+author: "Roland Widmer, 17-109-646"
+date: "2023-03-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1
+
+Use the diamonds data to fit a linear regression to model expected price (without logarithm) as a function of "carat" (no log), "color", "clarity", and "cut". Interpret the output of the model. Does it make sense?
+
+For the first four exercises, start with this snippet to turn the ordered factors into unordered ones.
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+diamonds <- mutate_if(diamonds, is.ordered, factor, ordered = FALSE)
+
+
+
+fit <- lm(price ~ carat + color + clarity + cut, data = diamonds)
+summary(fit)
+
+
+sqrt(mean(fit$residuals^2))
+
+```
+We can have diamonds with negative prices:
+The following diamond cutGood + claritySI2 + colorJ + 0 carat + intercept has a price under - 6'000$
+
+## 2
+
+Try to improve the model from Exercise 1 by adding interactions between our main predictor "carat" and "color", between "carat" and "cut", and also between "carat" and "clarity". Why could this make sense? How many additional parameters are required? How does the RMSE react?
+
+```{r}
+fit <- lm(price ~ carat * color + carat * cut + carat * clarity, data = diamonds)
+summary(fit)
+sqrt(mean(fit$residuals^2))
+```
+- 17 additional parameters
+- $R_adj$ is slightly better
+- $RMSE$ is improved too
+
+
+## 3
+
+In the regression in Exercise 1, represent "carat" by a restricted cubic spline with four knots. What is a restricted cubic spline (check on the internet)? How much better does the RMSE get? Visualize the effect of "carat". Hint: Restricted cubic splines are available in the R package "splines". 
+
+spline function = cubic
+unrestricted = no jumps between splines
+4 knots = 3 splines
+
+```{r}
+library(splines)
+
+# Create a restricted cubic spline basis matrix with 3 knots
+basis <- ns(diamonds$carat, df = 4)
+
+# View the first 5 rows of the basis matrix
+head(basis, 5)
+
+fit <- lm(price ~ basis, data = diamonds)
+summary(fit)
+sqrt(mean(fit$residuals^2))
+```
+
+
+## 4
+
+Fit a Gamma regression with log-link to explain diamond prices by "log(carat)", "color", "cut", and "clarity". Compare the coefficients with those of a linear regression having the same covariates, but using "log(price)" as response. Calculate the relative bias of the average prediction. Why isn't it 0?
+
+## 5
+
+Fit the Gamma GLM of Exercise 4 with H2O, optionally replacing the data preparation with "data.table". Do you get the same results?

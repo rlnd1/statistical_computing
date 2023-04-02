@@ -1026,10 +1026,18 @@ independence_test(y ~ factor(x) | factor(block), distribution = "exact")
     you want to show the alternative hypothesis that the true rank correlation is positive.
     c. Use a simulated example to compare with the corresponding p values from the "coin" package, and also using `stats::cor.test(x, y, method = "s", method = "greater")`.
     
+Important: one-sided != two-sided!! abs(...) is important
+    
 5. In the situation of Exercise 4: Use simulation to compare your approach with `stats::cor.test()` regarding...
     a. ... Type 1 error? (Work with independent normal random variables)
     b. ... power? (Work with dependent normal random variables).
     c. How do you interpret your result?
+    
+which Type 1 error is closer to 5? (anticonservative)
+power? 1-Type 2 error (?)
+
+repeated sampling -> compare two in two dimension
+if we have just one sample (as in reality) -> not possible
 
 # Summary
 

@@ -612,7 +612,7 @@ query <- "
     carat, LOG(price) AS log_price 
   FROM dia 
   ORDER BY carat DESC
-"
+" # in reality: Database name, Database scheme name (like folders in database world), Table name. Query as string
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
@@ -625,7 +625,8 @@ query <- "
   WHERE 
     carat > 2 
     AND color = 'E'
-"
+" # Filter for some condition
+# Use single quotes instead of double quotes
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
@@ -642,6 +643,7 @@ query <- "
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch()
+# so just one row (like summarize in dplyr)
 
 # Grouped aggregate
 query <- "
@@ -671,6 +673,9 @@ query <- "
   ) G
   ON D.color = G.color
 "
+# Left join: left side dia table (color, ...), right table color (color, x)
+# Left join: do not change left table's rows (no additional rows) but enrich it with data from right table (lookup table). It is important, that on right table no multiple rows for the same key, otherwise we will add more rows to the left side.
+
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
@@ -740,6 +745,8 @@ query <- "
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() 
+# get number of rows WITHOUT reading in the data
+
 
 # Pickup location IDs with at least 100'000 rows
 # 'HAVING' is like a 'WHERE', but after a GROUP BY
@@ -751,10 +758,12 @@ query <- "
   GROUP BY PULocationID
   HAVING N >= 100000
 "
+# WHERE: before aggregation/group by
+# HAVING: after aggregation/group by
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
-  head()
+  head() # just show top five
 
 # Prepare taxi model data directly from Parquet
 query <- "
@@ -784,6 +793,9 @@ system.time(
     dbSendQuery(query) %>% 
     dbFetch() 
 )
+# we do basically the same as with data.table but entirely in SQL
+# only needs 3 seconds
+# in data.table (fastest in R) was around 10 seconds (amazing that DuckDB is so much faster)
 
 head(df)
 ```
@@ -800,6 +812,8 @@ Spark normally runs on a cluster consisting of many hundreds of nodes (= compute
 
 Let's start a local Spark instance and apply some small queries to the diamond data. We will use both SQL and "dplyr" code, which will then be translated into Spark.
 
+in industry: Spark is common, DuckDb not (too new)
+
 ```{r, eval=FALSE}
 library(tidyverse)
 library(DBI)
@@ -808,6 +822,8 @@ library(sparklyr)
 
 # Local Spark instance
 sc <- spark_connect(master = "local")
+# we see Java process in Task Manager
+# took 1 second, seems slow
 
 # Loads data to Spark
 dia <- copy_to(sc, diamonds)
@@ -841,6 +857,9 @@ dia %>%
   group_by(color) %>% 
   summarise(N = count(), mean_price = mean(price)) %>% 
   arrange(color)
+
+# this dplyr code is automatically translated to Spark
+# note: we used the spark connection object, not a df!
 
 #   color     N mean_price
 #   <chr> <dbl>      <dbl>

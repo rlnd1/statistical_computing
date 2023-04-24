@@ -252,6 +252,10 @@ x <- c("log_carat", "color", "cut", "clarity")
 # Scaled feature matrix
 X <- scale(data.matrix(diamonds[x]))
 
+# Why do we scale?
+# https://medium.com/analytics-vidhya/why-is-scaling-required-in-knn-and-k-means-8129e4d88ed7
+# KNN needs scaled features (since it is distance-based between features)
+
 # not totally correct: perfect would be to scale it dependent on the folds
 # we have a small leakage of training data to validation data
 
@@ -267,7 +271,10 @@ table(fold_ix)
 paramGrid <- data.frame(RMSE = NA, k = 1:20)
     
 # Calculate performance for each row in the parameter grid
+# important: We have two for loops!!
 for (i in 1:nrow(paramGrid)) {
+  # Why don't we use i directly?
+  # k does not have to coincide with i!
   k <- paramGrid[i, "k"]
   
   scores <- numeric(nfolds)
@@ -277,6 +284,8 @@ for (i in 1:nrow(paramGrid)) {
     X_train <- X[insample, ]
     y_train <- diamonds[insample, y]
     
+    # why ! and not -? insample is a list of booleans!
+    # we use ! when working with booleans
     X_valid <- X[!insample, ]
     y_valid <- diamonds[!insample, y]
 

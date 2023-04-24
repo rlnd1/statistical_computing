@@ -1,0 +1,254 @@
+---
+title: "Assignment04"
+author: "Roland Widmer"
+date: "2023-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1
+Use simple validation to determine whether a linear regression for `log(price)` with covariates `log(carat)`, `color`, `cut`, and `clarity` is better with or without interaction between `log(carat)` and `cut` regarding RMSE. Use a 80/20 data split. Make sure that the code is fully reproducible.
+
+```{r}
+# use 80/20 split
+library(tidyverse)
+library(withr)
+
+diamonds <- mutate_if(diamonds, is.ordered, factor, ordered = FALSE)
+
+df <- transform(diamonds, log_price = log(price), log_carat = log(carat))
+
+with_seed(
+  1,
+  indices_train <- sample(nrow(diamonds), 0.8 * nrow(diamonds))
+)
+
+X_cols = c("log_carat", "color", "cut", "clarity")
+y_col = "log_price"
+
+df_train = df[indices_train,]
+df_valid = df[-indices_train,]
+
+# train linear models
+fit1 <- lm(log_price ~ log_carat + color + cut + clarity, data = df_train)
+fit2 <- lm(log_price ~ log_carat * cut + color + clarity, data = df_train)
+
+# !!! Use validation data !!!
+res1 <- df_valid$log_price - predict(fit1, df_valid)
+res2 <- df_valid$log_price - predict(fit2, df_valid)
+sqrt(mean(res1^2))
+sqrt(mean(res2^2))
+```
+
+## 2
+Use 5-fold cross-validation to select the best polynomial degree to represent `log(carat)` in a Gamma GLM for diamond prices with log-link (with additional covariates `color`, `cut`, and `clarity`). Evaluate the result on 10% test data. Use the average Gamma deviance as performance measure (function `deviance_gamma()` in the package "MetricsWeighted"). Again make sure that the code is fully reproducible.
+
+Important: Test data != validation data
+
+```{r}
+# To-do: 10% validation daa
+library(MetricsWeighted)
+
+n_folds <- 5
+with_seed(
+  1,
+  indices_folds <- sample(1:n_folds, nrow(diamonds), replace = TRUE)
+  # this indicates for every row to which fold it belongs to
+  # other concept as in simple validation
+)
+
+param_grid <- data.frame(deviance = NA, k = 1:10)
+
+for (param in 1:nrow(param_grid)) {
+  k <- param_grid[param, "k"] # or param_grid$k[param]
+  
+  # initialize scores 
+  scores <- numeric(n_folds)
+  
+  for (fold in 1:n_folds) {
+    intrain <- indices_folds != fold
+    train <- df[intrain,]
+    validation <- df[!intrain,]
+    
+    # glm 
+    # `log(carat)` in a Gamma GLM for diamond prices with log-link (with additional covariates `color`, `cut`, and `clarity`)
+    fit <- glm(price ~ poly(log_carat, k) + color + cut + clarity, data = train, family = Gamma(link = "log"))
+    pred <- predict(fit, validation)
+    
+    scores[fold] <- deviance_gamma(validation$price, pred)
+  }
+  param_grid[param, "deviance"] <- mean(scores)
+}
+
+param_grid
+```
+What is wrong here?
+
+## 3
+How does repeated CV work? List one advantage and one disadvantage compared to standard cross-validation. When would you recommend grouped cross-validation and why? How does it work?
+
+
+
+## 4
+Use DuckDB or Apache Spark to write SQL queries about the claims data. We need some definitions first: In insurance, the *pure premium* is defined as the ratio of the total claim amount and the total exposure. Exposure is usually measured in years (1 = 1 year). The pure premium is the fictive premium per unit of exposure required to cover the claims. The claim frequency is the ratio of the total claim number and the total exposure. Finally, the claim severity is the ratio of total claim amount and total claim number. Consequently: pure premium = frequency * severity.
+    a. Calculate total exposure, pure premium, frequency and severity on the full data.
+    b. Do the same stratified by the age category of the driver. Sort the results by "agecat". Interpret the results.
+    c. How many distinct values does the column "X_OBSTAT_" have? Use the "DISTINCT" keyword in SQL.
+    d. Add to the full data a binary column "female" (1 = yes, 0 = no) derived from "gender". Use the "CASE WHEN" clause. Can you avoid the "CASE WHEN" construction here?
+    
+    
+### Database setup
+
+```{r}
+
+library(duckdb)
+library(tidyverse)
+library(insuranceData)
+
+data("dataCar")
+
+# Initialize virtual DB and register insurance data
+con = dbConnect(duckdb(), read_only=FALSE)
+duckdb_register(con, name = "insurance_data", df = dataCar)
+
+query <- "
+  SELECT veh_value FROM insurance_data LIMIT 5
+"
+con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch()
+```
+### a
+Calculate total exposure, pure premium, frequency and severity on the full data.
+Total exposure:
+```{r}
+query <- "
+  SELECT SUM(exposure)
+  FROM insurance_data
+"
+total_exposure <- con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch() %>% 
+  as.numeric()
+total_exposure
+```
+Pure premium:
+```{r}
+query <- "
+  SELECT SUM(claimcst0)
+  FROM insurance_data
+"
+total_claim_amount_b <- con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch() %>% 
+  as.numeric()
+
+pure_premium <- total_claim_amount / total_exposure
+pure_premium
+```
+Claim frequency:
+```{r}
+query <- "
+  SELECT SUM(numclaims)
+  FROM insurance_data
+"
+claim_frequency <- con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch() %>% 
+  as.numeric()
+
+claim_frequency <- total_claim_number / total_exposure
+claim_frequency
+```
+Claim severity:
+
+```{r}
+claim_severity <- total_claim_amount / total_claim_number
+claim_severity
+```
+### b
+Total exposure:
+```{r}
+query <- "
+  SELECT agecat, SUM(exposure)
+  FROM insurance_data
+  GROUP BY agecat
+  ORDER BY agecat
+"
+total_exposure_b <- con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch()
+total_exposure_b
+
+# quick verification
+sum(total_exposure_b$`sum(exposure)`) #OK
+```
+Pure premium:
+```{r}
+query <- "
+  SELECT agecat, SUM(claimcst0)
+  FROM insurance_data
+  GROUP BY agecat
+  ORDER BY agecat
+"
+total_claim_amount_b <- con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch()
+
+# quick verification
+print(c(sum(total_claim_amount_b$`sum(claimcst0)`), total_claim_amount)) #OK
+
+pure_premium_b <- total_claim_amount_b / total_exposure_b
+pure_premium_b
+```
+Claim frequency:
+```{r}
+query <- "
+  SELECT agecat, SUM(numclaims)
+  FROM insurance_data
+  GROUP BY agecat
+  ORDER BY agecat
+"
+total_claim_number_b <- con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch()
+
+# quick verification
+print(c(sum(total_claim_number_b$`sum(numclaims)`), total_claim_number)) #OK
+
+claim_frequency_b <- total_claim_number_b / total_exposure_b
+claim_frequency_b
+```
+Claim severity:
+```{r}
+claim_severity_b <- total_claim_amount_b / total_claim_number_b
+claim_severity_b
+```
+### c
+```{r}
+query <- "
+  SELECT COUNT ( DISTINCT X_OBSTAT_ ) AS \"distinct_values\"
+  FROM insurance_data;
+"
+distinct_values <- con %>% 
+  dbSendQuery(query) %>% 
+  dbFetch() %>% 
+  as.numeric()
+distinct_values
+```
+Just one?
+
+### d
+```{r}
+# add column female
+query <- "
+  ALTER TABLE insurance_data
+  ADD COLUMN gender NUMBER(1)
+"
+con %>% 
+  dbWriteTable(query)
+```
+

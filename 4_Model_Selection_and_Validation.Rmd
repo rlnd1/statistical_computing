@@ -62,9 +62,11 @@ What prediction (on logarithmic price scale) would we get with 5-nearest-neighbo
 
 ```{r}
 library(ggplot2)
-library(FNN)
+library(FNN) # fast nearest neighbor
 
 diamonds <- transform(diamonds, log_price = log(price), log_carat = log(carat))
+
+# log carat quite important for euclidean distances (?)
 
 y <- "log_price"
 x <- c("log_carat", "color", "cut", "clarity")
@@ -72,16 +74,24 @@ x <- c("log_carat", "color", "cut", "clarity")
 # Scaled numeric feature matrix
 X <- scale(data.matrix(diamonds[, x]))
 
+#apply(X, 2, FUN = sd) column-wise sd, every thing 1 (so properly scaled)
+
 # The 10'000th observation
 diamonds[10000, c("price", "carat", x)]
 
 # Its prediction
 knn.reg(X, test = X[10000, ], k = 5, y = diamonds[[y]])
 
+# this value lives in log space, so use exp(...) to get other value
+
 # Its five nearest neighbors
 neighbors <- c(knnx.index(X, X[10000, , drop = FALSE], k = 5))
 diamonds[neighbors, ]
 ```
+We see that they are quite similar in most of the covariates
+Ugly: the predicted diamond is a neighbor (overfitting)
+Ugly: probably the same diamond multiple times in the table! (problem of the diamond data). We have to keep that in mind.
+
 
 **Comments** 
 
@@ -130,6 +140,8 @@ X_valid <- diamonds[-ix, x]
 X_train <- scale(data.matrix(X_train))
 
 # Apply training scale to validation data
+
+# would be really bad to use other scaling here!
 X_valid <- scale(
   data.matrix(X_valid),
   center = attr(X_train, "scaled:center"),
@@ -147,6 +159,8 @@ cat("Training RMSE:", RMSE(y_train, pred_train))
 pred_valid <- knn.reg(X_train, test = X_valid, k = 5, y = y_train)$pred
 cat("Validation RMSE:", RMSE(y_valid, pred_valid))
 ```
+
+We see quite a difference on RMSE for train/validation data.
 
 **Comment:** Validation RMSE is substantially worse than training RMSE, a clear sign of overfitting. However, it is still much better than the (full-sample) performance of linear regression (residual standard error was 0.1338).
 
@@ -180,6 +194,12 @@ ggplot(aes(x = k, y = RMSE, group = Data, color = Data)) +
   geom_point() +
   geom_line()
 ```
+
+which validation performance is the best? for k = 6
+validation performance is always worse than training performance (clear, since the predicted value is a neighbor too)
+typical plot: there is an optimum, not k the bigger the better
+why k=1 not 0 for training data? strange, because multiple diamonds with the same covariates -> random selection of one?
+typical exam question
 
 **Comments**
 
@@ -232,6 +252,13 @@ x <- c("log_carat", "color", "cut", "clarity")
 # Scaled feature matrix
 X <- scale(data.matrix(diamonds[x]))
 
+# Why do we scale?
+# https://medium.com/analytics-vidhya/why-is-scaling-required-in-knn-and-k-means-8129e4d88ed7
+# KNN needs scaled features (since it is distance-based between features)
+
+# not totally correct: perfect would be to scale it dependent on the folds
+# we have a small leakage of training data to validation data
+
 # Split diamonds into folds
 nfolds <- 5
 with_seed(
@@ -244,17 +271,23 @@ table(fold_ix)
 paramGrid <- data.frame(RMSE = NA, k = 1:20)
     
 # Calculate performance for each row in the parameter grid
+# important: We have two for loops!!
 for (i in 1:nrow(paramGrid)) {
+  # Why don't we use i directly?
+  # k does not have to coincide with i!
   k <- paramGrid[i, "k"]
   
   scores <- numeric(nfolds)
   
   for (fold in 1:nfolds) {
-    X_train <- X[fold_ix != fold, ]
-    y_train <- diamonds[fold_ix != fold, y]
+    insample <- fold_ix != fold
+    X_train <- X[insample, ]
+    y_train <- diamonds[insample, y]
     
-    X_valid <- X[fold_ix == fold, ]
-    y_valid <- diamonds[fold_ix == fold, y]
+    # why ! and not -? insample is a list of booleans!
+    # we use ! when working with booleans
+    X_valid <- X[!insample, ]
+    y_valid <- diamonds[!insample, y]
 
     pred <- knn.reg(X_train, test = X_valid, k = k, y = y_train)$pred
     scores[fold] <- RMSE(y_valid, pred)
@@ -270,6 +303,15 @@ ggplot(paramGrid, aes(x = k, y = RMSE)) +
   geom_line(color = "chartreuse4") +
   ggtitle("Performance by cross-validation")
 ```
+
+Meta seach: caret package
+mlr3: object oriented (R6) approach (Python, C++)
+tidymodels (strange but modern)
+
+Often we can delegate it to other function
+
+Curve: k is from NN, so probably 7 seems to be the best choice
+Repeated CV necessary? Look at SE, SD.
 
 **Comment:** Using 7 neighbors seems to be the best choice regarding CV RMSE. Again, the fact that certain diamonds show up multiple times leaves a slightly bad feeling. Should we really trust these results?
 
@@ -307,6 +349,8 @@ Remark: For simplicity, Workflow A is sometimes done without refitting on the co
 ## Example: Workflow B
 
 We will now follow Workflow B for our diamond price model. We will (1) tune the $k$ of our nearest-neighbor regression and (2) compare its result with a linear regression. The model with best CV performance will be evaluated on the test data.
+
+not only tune k but also give linear regression a chance:
 
 ```{r}
 library(ggplot2)
@@ -359,11 +403,12 @@ for (i in 1:nrow(paramGrid)) {
   scores <- numeric(nfolds)
   
   for (fold in 1:nfolds) {
-    X_train_cv <- X_train[fold_ix != fold, ]
-    y_train_cv <- y_train[fold_ix != fold]
+    insample <- fold_ix != fold
+    X_train_cv <- X_train[insample, ]
+    y_train_cv <- y_train[insample]
     
-    X_valid_cv <- X_train[fold_ix == fold, ]
-    y_valid_cv <- y_train[fold_ix == fold]
+    X_valid_cv <- X_train[!insample, ]
+    y_valid_cv <- y_train[!insample]
     
     pred <- knn.reg(X_train_cv, test = X_valid_cv, k = k, y = y_train_cv)$pred
     scores[fold] <- RMSE(y_valid_cv, pred)
@@ -378,11 +423,15 @@ head(paramGrid[order(paramGrid$RMSE), ], 2)
 rmse_reg <- numeric(nfolds)
 
 for (fold in 1:nfolds) {
-  fit <- lm(reformulate(x, y), data = train[fold_ix != fold, ])
-  pred <- predict(fit, newdata = train[fold_ix == fold, ])
-  rmse_reg[fold] <- RMSE(y_train[fold_ix == fold], pred)
+  insample <- fold_ix != fold
+  fit <- lm(reformulate(x, y), data = train[insample, ])
+  pred <- predict(fit, newdata = train[!insample, ])
+  rmse_reg[fold] <- RMSE(y_train[!insample], pred)
 }
+# try reformulate(x,y), just expands the formula
 (rmse_reg <- mean(rmse_reg))
+
+# NN is much better than linear regression
 
 # The overall best model is 6-nearest-neighbor
 pred <- knn.reg(X_train, test = X_test, k = 6, y = y_train)$pred
@@ -390,6 +439,11 @@ pred <- knn.reg(X_train, test = X_test, k = 6, y = y_train)$pred
 # Test performance for the best model
 RMSE(y_test, pred)
 ```
+With caret, mlr3, tidymodels -> reduce code by around 50%.
+but not 5 loc!
+a bit of unfairness: nearest neighbor had more chances than linear regression. We could add splines, interactions, ... . But it would be really hard to beat the NN.
+
+Statistician would use p-values. But often we don't have p-values.
 
 **Comments** 
 
@@ -459,7 +513,8 @@ h2o_split <- h2o.splitFrame(
 
 system.time(  # 12 s
   fit <- h2o.glm(
-    x, "log_duration", 
+    x = x, 
+    y = "log_duration", 
     training_frame = "train", 
     validation_frame = "valid", 
     lambda_search = TRUE, 
@@ -473,7 +528,8 @@ h2o_trainvalid <- h2o.rbind(h2o_split[[1]], h2o_split[[2]])
 
 # Fit model with optimal lambda (0)
 fit_final <- h2o.glm(
-  x, "log_duration", 
+  x = x, 
+  y = "log_duration", 
   training_frame = h2o_trainvalid, 
   validation_frame = "test", 
   lambda = 0,
@@ -483,7 +539,7 @@ fit_final <- h2o.glm(
 fit_final  # Test R^2: 0.7814
 ```
 
-**Comment:** According to simple validation, adding an L2 penalty is not necessary. Thus, the final model is fitted without penalty on the pooled 90% training and validation data. Its test R-squared is very similar to the validation R-squared, indicating that there is no problematic overfit on the validation data. Why adding a penalty did not help to improve the model? Usually, ridge regression shines when the $n/p$ ratio is small. In our case, however, it is very large.
+**Comment:** According to simple validation, no L2 penalty is needed. Thus, the final model is fitted without penalty on the pooled 90% training and validation data. Its test R-squared is very similar to the validation R-squared, indicating that there is no problematic overfit on the validation data. Why adding a penalty did not help to improve the model? Usually, ridge regression shines when the $n/p$ ratio is small. In our case, however, it is very large.
 
 # Random Splitting?
 
@@ -520,13 +576,13 @@ Data tables are usually stored as files on a hard drive or as tables in a databa
 - what information the columns bear, and
 - what possible sources of bias might be present.
 
-For small data sets, the raw data is usually loaded into R/Python and then preprocessed in memory. For large data sets, this becomes slow or even impossible. One option is to externalize the preprocessing to a database management system (DBMS) with its out-of-core capabilities or to a big data technology like Spark. In this section, we take a short trip into that world.
+For small data sets, the raw data is usually loaded into R/Python and then preprocessed in memory. For large data sets, this becomes slow or even impossible. One option is to externalize the preprocessing to a database server with its out-of-core capabilities or to a big data technology like Spark. In this section, we take a short trip into that world.
 
 ## SQL
 
-Communication with the database is usually done with *SQL* (Structured Query Language). This is one of the most frequently used programming languages in data science. The SQL code is usually written directly in the DBMS or in R/Python. SQL is pronounced as "es-kiu-el" or "si-kwel".
+Communication with the database is usually done with *SQL* (Structured Query Language). This is one of the most frequently used programming languages in data science. The SQL code is usually written directly in a Database Management System (DBMS) or in R/Python. SQL is pronounced as "es-kiu-el" or "si-kwel".
 
-We will introduce SQL with examples written in the in-process DBMS [DuckDB](duckdb.org). "In-process" means that when DuckDB is run from R/Python, it is embedded in the R/Python process itself. DuckDB is convenient for several reasons:
+We will introduce SQL with examples written in the in-process database [DuckDB](duckdb.org). "In-process" means that when DuckDB is run from R/Python, it is embedded in the R/Python process itself. DuckDB is convenient for several reasons:
 
 - It is easy to install.
 - It has no external dependencies.
@@ -543,6 +599,8 @@ Remark: While there is an ISO norm for SQL, specific implementations (DuckDB, Sp
 
 To familiarize you with SQL, we will write some basic SQL queries (= questions) with DuckDB about the diamond data. (Also remember the "Translator" table of Chapter 1.)
 
+**Note that we use `head()` to keep the output slim. Usually, you would not need it.**
+
 ```{r}
 library(duckdb)
 library(tidyverse)
@@ -555,7 +613,7 @@ duckdb_register(con, name = "dia", df = diamonds)
 con %>% 
   dbSendQuery("SELECT * FROM dia") %>% 
   dbFetch() %>% 
-  head()
+  head()  # See note above
 
 # carat and log(price) sorted by carat in descending order
 query <- "
@@ -563,7 +621,7 @@ query <- "
     carat, LOG(price) AS log_price 
   FROM dia 
   ORDER BY carat DESC
-"
+" # in reality: Database name, Database scheme name (like folders in database world), Table name. Query as string
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
@@ -576,7 +634,8 @@ query <- "
   WHERE 
     carat > 2 
     AND color = 'E'
-"
+" # Filter for some condition
+# Use single quotes instead of double quotes
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
@@ -593,11 +652,12 @@ query <- "
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch()
+# so just one row (like summarize in dplyr)
 
 # Grouped aggregate
 query <- "
   SELECT 
-    COLOR
+    color
     , COUNT(*) AS N
     , AVG(price) AS avg_price
     , SUM(price) / 1e6 AS sum_price_mio
@@ -612,7 +672,7 @@ con %>%
 # Join average price per color to original data as nested query
 # using color as join "key"
 query <- "
-  SELECT *
+  SELECT D.*, avg_price
   FROM dia D
   LEFT JOIN 
   (
@@ -622,6 +682,9 @@ query <- "
   ) G
   ON D.color = G.color
 "
+# Left join: left side dia table (color, ...), right table color (color, x)
+# Left join: do not change left table's rows (no additional rows) but enrich it with data from right table (lookup table). It is important, that on right table no multiple rows for the same key, otherwise we will add more rows to the left side.
+
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
@@ -629,15 +692,15 @@ con %>%
 
 # Instead of nesting, we can use "WITH" to connect multiple queries
 query <- "
-  WITH grouped AS
+  WITH G AS
   (
     SELECT color, AVG(price) AS avg_price
     FROM dia
     GROUP BY color
   )
-  SELECT *
+  SELECT D.*, avg_price
   FROM dia D
-  LEFT JOIN GROUPED G
+  LEFT JOIN G
     ON D.color = G.color
 "
 con %>% 
@@ -691,6 +754,8 @@ query <- "
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() 
+# get number of rows WITHOUT reading in the data
+
 
 # Pickup location IDs with at least 100'000 rows
 # 'HAVING' is like a 'WHERE', but after a GROUP BY
@@ -702,10 +767,12 @@ query <- "
   GROUP BY PULocationID
   HAVING N >= 100000
 "
+# WHERE: before aggregation/group by
+# HAVING: after aggregation/group by
 con %>% 
   dbSendQuery(query) %>% 
   dbFetch() %>% 
-  head()
+  head() # just show top five
 
 # Prepare taxi model data directly from Parquet
 query <- "
@@ -735,6 +802,9 @@ system.time(
     dbSendQuery(query) %>% 
     dbFetch() 
 )
+# we do basically the same as with data.table but entirely in SQL
+# only needs 3 seconds
+# in data.table (fastest in R) was around 10 seconds (amazing that DuckDB is so much faster)
 
 head(df)
 ```
@@ -751,6 +821,8 @@ Spark normally runs on a cluster consisting of many hundreds of nodes (= compute
 
 Let's start a local Spark instance and apply some small queries to the diamond data. We will use both SQL and "dplyr" code, which will then be translated into Spark.
 
+in industry: Spark is common, DuckDb not (too new)
+
 ```{r, eval=FALSE}
 library(tidyverse)
 library(DBI)
@@ -759,8 +831,10 @@ library(sparklyr)
 
 # Local Spark instance
 sc <- spark_connect(master = "local")
+# we see Java process in Task Manager
+# took 1 second, seems slow
 
-# Register data on Spark
+# Loads data to Spark
 dia <- copy_to(sc, diamonds)
 
 # SQL commands refer to Spark name "diamonds"
@@ -792,6 +866,9 @@ dia %>%
   group_by(color) %>% 
   summarise(N = count(), mean_price = mean(price)) %>% 
   arrange(color)
+
+# this dplyr code is automatically translated to Spark
+# note: we used the spark connection object, not a df!
 
 #   color     N mean_price
 #   <chr> <dbl>      <dbl>
@@ -898,7 +975,7 @@ spark_disconnect(sc)
 
 1. Use simple validation to determine whether a linear regression for `log(price)` with covariates `log(carat)`, `color`, `cut`, and `clarity` is better with or without interaction between `log(carat)` and `cut` regarding RMSE. Use a 80/20 data split. Make sure that the code is fully reproducible. 
 
-2. Use 5-fold cross-validation to select the best polynomial degree to represent `log(carat)` in a Gamma GLM for diamonds prices with log-link (with additional covariates `color`, `cut`, and `clarity`). Evaluate the result on 10% test data. Use the average Gamma deviance as performance measure (function `deviance_gamma()` in the package "MetricsWeighted"). Again make sure that the code is fully reproducible.
+2. Use 5-fold cross-validation to select the best polynomial degree to represent `log(carat)` in a Gamma GLM for diamond prices with log-link (with additional covariates `color`, `cut`, and `clarity`). Evaluate the result on 10% test data. Use the average Gamma deviance as performance measure (function `deviance_gamma()` in the package "MetricsWeighted"). Again make sure that the code is fully reproducible.
 
 3. How does repeated CV work? List one advantage and one disadvantage compared to standard cross-validation. When would you recommend grouped cross-validation and why? How does it work?
 

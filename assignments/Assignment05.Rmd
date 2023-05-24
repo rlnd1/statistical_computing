@@ -1,0 +1,256 @@
+---
+title: "Assignment05"
+author: "Roland Widmer"
+date: "2023-05-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1
+Explain in simple words: What is bagging? What is a random forest? What is out-of-bag performance?
+
+Bagging = Bootstrap aggregating. We train our model on different Bootstrap samples.To classify -> majority vote, for regression average values.
+
+The random forest algorithm is an extension of the bagging method as it utilizes both bagging and feature randomness to create an uncorrelated forest of decision trees.
+
+Out-of-bag-Performance: Measure performance with obervations not in the corresponding bootstrap sample.
+
+## 2
+Try to improve the random forest fitted on the diamonds data by playing with the mtry parameter. What does it do? Pick the mtry with best OOB performance. Does this improve the test performance?
+
+```{r}
+
+```
+
+## 3
+Fit a random forest on the claims data for the binary variable clm using covariates veh_value, veh_body, veh_age, gender, area, and agecat. Choose a suitable tree depth either by cross-validation or by minimizing OOB error on the training data. Make sure to fit a probability random forest, i.e., predicting probabilities, not classes. Evaluate the final model on an independent test data set. (Note that the "ranger" package uses the "Brier score" as the evaluation metric for probabilistic predictions. In the binary case, is the same as the MSE.) Interpret the results by split gain importance and partial dependence plots.
+
+
+## 1
+
+Consider the fully tuned XGBoost model for the diamonds data in the lecture notes above. Study the online documentation of XGBoost to figure out how to make the model monotonically increasing in log_carat. Test your approach without repeating the grid search part. How does the partial dependence plot for log_carat look now?
+
+```{r}
+# This code is pretty long. It may serve as a general template to fit a
+# high-performance XGBoost model
+library(tidyverse)
+library(withr)
+library(xgboost)
+
+diamonds <- transform(diamonds, log_price = log(price), log_carat = log(carat))
+
+y <- "log_price"
+x <- c("log_carat", "color", "cut", "clarity")
+
+# Split into train and test
+with_seed(
+  9838,
+  ix <- sample(nrow(diamonds), 0.8 * nrow(diamonds))
+)
+
+y_train <- diamonds[ix, y]
+X_train <- diamonds[ix, x]
+
+y_test <- diamonds[-ix, y]
+X_test <- diamonds[-ix, x]
+
+# XGBoost data interface
+dtrain <- xgb.DMatrix(data.matrix(X_train), label = y_train)
+
+# If grid search is to be run again, set tune <- TRUE
+tune <- FALSE
+
+# copy paste for other projects!
+
+if (tune) {
+  # Use default parameters to set learning rate with suitable number of rounds
+  params <- list(
+    learning_rate = 0.1,
+    objective = "reg:squarederror",
+    eval_metric = "rmse"
+  )
+  
+  # Cross-validation
+  cvm <- xgb.cv(
+    params = params,
+    data = dtrain,
+    nrounds = 5000,
+    nfold = 5,
+    early_stopping_rounds = 20, 
+    showsd = FALSE, 
+    print_every_n = 50
+  )
+  cvm   # -> a lr of 0.1 provides about 200 trees, which is a convenient amount
+   
+  # fix this to tune other params
+  
+  
+  # Final grid search after some iterations
+  grid <- expand.grid(
+    iteration = NA,
+    cv_score = NA,
+    train_score = NA,
+    learning_rate = 0.1,
+    objective = "reg:squarederror",
+    eval_metric = "rmse",
+    max_depth = 6:7, 
+    min_child_weight = c(1, 10),
+    colsample_bytree = c(0.8, 1), 
+    subsample = c(0.8, 1), 
+    reg_lambda = c(0, 2.5, 5, 7.5),
+    reg_alpha = c(0, 4),
+    # tree_method = "hist",   # when data is large
+    min_split_loss = c(0, 1e-04)
+  )
+  
+  # calculate size of grid -> here 256 (quite large)
+  # wait or do a randomized search
+
+ # Grid search or randomized search if grid is too large
+  max_size <- 20
+  grid_size <- nrow(grid)
+  if (grid_size > max_size) {
+    grid <- grid[sample(grid_size, max_size), ]
+    grid_size <- max_size
+  }
+
+  # Loop over grid and fit XGBoost with five-fold CV and early stopping
+  pb <- txtProgressBar(0, grid_size, style = 3)
+  for (i in seq_len(grid_size)) {
+    cvm <- xgb.cv(
+      params = as.list(grid[i, -(1:2)]),
+      data = dtrain,
+      nrounds = 5000,
+      nfold = 5,
+      early_stopping_rounds = 20,
+      verbose = 0
+    )
+    
+    # Store result
+    grid[i, 1] <- cvm$best_iteration
+    grid[i, 2:3] <- cvm$evaluation_log[, c(4, 2)][cvm$best_iteration]
+    setTxtProgressBar(pb, i)
+  
+    # Save grid to survive hard crashs
+    saveRDS(grid, file = "simulation/diamonds_xgb.rds")
+  }
+}
+
+# Load grid and select best iteration
+grid <- readRDS("simulation/diamonds_xgb.rds")
+grid <- grid[order(grid$cv_score), ]
+head(grid)
+
+# Fit final, tuned model
+prms <- as.list(grid[1, -(1:3)])
+prms_c <- as.list(grid[1, -(1:3)])
+prms_c$monotone_constraints <- c(1, 0, 0, 0) # monotone constraint on first covariate, no constraint on others
+
+fit <- xgb.train(
+  params = prms, 
+  data = dtrain, 
+  nrounds = grid[1, "iteration"]
+)
+fit_c <- xgb.train(
+  params = prms_c, 
+  data = dtrain, 
+  nrounds = grid[1, "iteration"]
+)
+```
+Partial dependence:
+```{r}
+library(flashlight)
+
+# Partial dependence plots
+fl <- flashlight(
+  model = fit, 
+  data = X_train, 
+  label = "XGB", 
+  predict_function = function(m, X) predict(m, data.matrix(X))
+)
+
+for (v in x) {
+  p <- light_profile(fl, v = v, n_bins = 40) %>% 
+    plot(color = "chartreuse4") +
+    labs(title = paste("PDP for", v), y = "Prediction") 
+  print(p)
+}
+
+fl_c <- flashlight(
+  model = fit_c, 
+  data = X_train, 
+  label = "XGB", 
+  predict_function = function(m, X) predict(m, data.matrix(X))
+)
+
+for (v in x) {
+  p <- light_profile(fl_c, v = v, n_bins = 40) %>% 
+    plot(color = "red") +
+    labs(title = paste("PDP for", v), y = "Prediction") 
+  print(p)
+}
+
+
+```
+
+
+## 2
+
+In the gradient boosted trees algorithm for the squared error, why do we fit a regression tree to the residuals instead of simply adding as new model the residuals itself?
+
+In prediction settings, we do not know the residuals. WRONG? During training time, the residuals are known
+Prevent overfitting?
+
+## 3
+
+(Optional) Develop an XGBoost model for the claims data set with binary response clm, and covariates veh_value, veh_body, veh_age, gender, area, and agecat. Use a clean cross-validation/test approach. Use log loss as loss function and evaluation metric. Interpret its results. You don't need to write all the code from scratch, but rather modify the XGBoost code from the lecture notes.
+
+```{r}
+
+```
+
+
+
+PDP log_carat: one small place where it goes down
+bad for the model ("one additional bathroom -> lower price")
+-> solution: use constraints
+
+tree depth 1 = additive model (single split trees)
+tree depth 0 = constant model
+for boosting 6 is quite deep
+
+pdp is fixed (trick to fix zig zag)
+but does not work if we have a completely different pdp 
+
+
+5
+conceptual question.
+why do we need a model? at prediction time, we do not have access to the residuals ???Why???
+
+6
+
+learning rate effect on number of trees with early stopping
+higher learning rate -> faster
+
+min_child_weight should be small number
+
+there are package
+
+
+
+Exercise 6
+
+we need keras log (k_log) but division is okay
+derivatives is handled by tensor flow
+
+
+Important: do not log twice (log link) so the response is just the price
+
+
+OLS never bias on model scale
+Neural Network -> Bias
+Trees no bias
+

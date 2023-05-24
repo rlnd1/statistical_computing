@@ -74,6 +74,7 @@ sqrt(mean(fit$residuals^2))
 
 Fit a Gamma regression with log-link to explain diamond prices by "log(carat)", "color", "cut", and "clarity". Compare the coefficients with those of a linear regression having the same covariates, but using "log(price)" as response. Calculate the relative bias of the average prediction. Why isn't it 0?
 
+
 ```{r}
 library(ggplot2)
 
@@ -88,6 +89,63 @@ summary(fit)
 ```
 
 
+
+this model is a competitor
+usually biased (too small)
+
+R: ordered factors: no dummy contrasts but polynomials
+contrasts(diamonds$color) columns dummy variables, rows levels: D -> all 0, E one 1 others 0
+
+change it with
+
+contrasts(diamonds) <- "contr.treatment"
+
+relative bias of -0.0022517 on original scale (small)
+OLS regression of fit_lm: -0.01121 (1% bias on original scale)
+to get zero bias: use natural link (inversed log link?)
+
+zapsmall (is value small?)
+
 ## 5
 
 Fit the Gamma GLM of Exercise 4 with H2O, optionally replacing the data preparation with "data.table". Do you get the same results?
+
+
+## Exercise 4 solution notes:
+
+### 1
+
+seed everything! to make it reproducible (important for master thesis, otherwise we need to replace all numbers after a rerun)
+some tools are hard to seed, e.g. TensorFlow
+
+Another strategy: consider the p-value of the interaction term (statistician's approach)
+data split: data scientist's approach
+
+strangely it is significant (why? strange)
+
+### 2
+
+a lot of code -> copy paste or use caret (meta tool).
+
+k = 8 > relatively large, too large for a final model
+maybe use splines with 5 knots
+
+if we retrain: we get a worse performance -> a bit of overfitting, a bit of chance (since it only has 10% )
+
+why less overfitting if we use k-folds and not naive approach?
+cross-validation between 5 or 10 folds.
+
+### 3
+
+Repeated: 5 folds and then another 5 folds (but with a different seed, classical mistake)
+advantage: better results
+disadvantage: more time
+
+Grouped CV: when data is clustered (e.g. multiple rows per patient)
+To have no leakage between data partitions
+Necessary if we have clustered/structure in data.
+Otherwise we don't have to care about.
+
+-> expect such kinds of question in the exam
+-> but also some coding exercises
+

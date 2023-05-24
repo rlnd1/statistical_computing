@@ -107,7 +107,7 @@ plot(
   data = diamonds, 
   col = "chartreuse4", 
   pch = ".", 
-  log = "xy", 
+  log = "xy", # here we set the log scale
   main = "log-log scale"
 )
 
@@ -296,7 +296,7 @@ head(diamonds_long, 4)
 The following table helps to translate between base R and "dplyr". It also includes other technologies that we will meet later: "data.table" for fast data processing, and the data query language *SQL*.
 
 | Task                 |       base R       |         dplyr          |       data.table        |        SQL         |
-|:--------------|:-------------:|:-------------:|:-------------:|:-------------:|
+|:---------------------|:------------------:|:----------------------:|:-----------------------:|:------------------:|
 | Pick columns         | `subset`/`[cols]`  |        `select`        |       `X[, cols]`       |      `SELECT`      |
 | Transform columns    |  `transform`/`<-`  |        `mutate`        |     `X[, z := ...]`     |      `SELECT`      |
 | Rename a column      |     depends...     |        `rename`        |       `setnames`        |        `AS`        |
@@ -563,6 +563,7 @@ b <- 12
 gcd(a, b)  # 3
 a  # unchanged 45
 ```
+
 Never change something in the "parent environment"!
 
 Similarly, the least common multiple of two natural numbers is their product divided by the GCD. We can re-use `gcd()` to create a compact function `lcm()`:
@@ -609,9 +610,7 @@ b <- a %% b  # a modulo b
 
 Our final version of the function `gcd()` uses *input checks*. Note: for very large numbers above $2^{50}$, the function would start to return garbage because of floating point issues.
 
-Integers bigger than 2^50 -> converted to a floating point number with precision -> algorithm will fail.
-So for cryptographic uses, we need to use packages that allow bigger precise integers.
-In Python, we don't have this issues.
+Integers bigger than 2\^50 -\> converted to a floating point number with precision -\> algorithm will fail. So for cryptographic uses, we need to use packages that allow bigger precise integers. In Python, we don't have this issues.
 
 We don't do this for analysis (but for packages).
 

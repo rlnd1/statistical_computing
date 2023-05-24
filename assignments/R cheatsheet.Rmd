@@ -1,0 +1,148 @@
+---
+title: "R Cheatsheet"
+author: "Roland Widmer, 17-109-646"
+date: "2023-05-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Base R
+
+```{r}
+age = c(20, 23, 35) 
+name = c("Petra", "Peter", "Peterina") 
+female = c(TRUE, FALSE, TRUE) 
+df = data.frame(age, name, female)  
+```
+
+subset(): Select rows and columns of data frame
+
+```{r}
+subset(df, age > 23, select=name:female)
+```
+transform(): Add or overwrite columns in data frame
+```{r}
+transform(df, male = !female)
+```
+
+aggregate(), tapply(), rowsum(), by(): Grouped calculations
+
+```{r}
+aggregate(df$age, by = list(df$female), FUN="mean")
+
+tapply(df$age, df$female, mean)
+
+rowsum(df$age, c(1, 1, 2)) # not the same as rowSums
+    # group indicates the group for every row of x
+
+by(df$age, df$female, mean) # wrapper of tapply for df
+
+```
+
+ave(): Grouped transformations
+
+```{r}
+ave(df$age, df$female, FUN = mean)
+```
+
+rbind(), cbind(): Bind rows/columns of data frame/matrix
+
+```{r}
+cbind(rep(1,5), rep(2, 5))
+rbind(rep(1,5), rep(2, 5))
+```
+
+
+merge(): Join data frames by key
+
+```{r}
+profession <- c("Student", "Bar tender", "Fire fighter")
+
+df_prof <- data.frame(name, profession)
+
+merge(df, df_prof, by.x = "name", by.y = "name")
+```
+
+
+expand.grid(): Cross-join lists/data frames
+
+```{r}
+x <- 1:10
+y <- 1:10
+grid <- expand.grid(x, y) # cartesian product
+```
+
+
+head(), tail(): First/last few elements of object
+
+nrow(), ncol(), dim(): Number of rows/columns of data frame/matrix
+
+order(), rank(): Sort indices, ranks
+
+```{r}
+order(df_prof$profession, decreasing = TRUE)
+
+df_prof[order(df_prof$profession, decreasing = TRUE),] # sorted 
+
+v <- c(3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
+
+rank(v) # by default: mean!
+order(v)
+```
+
+
+rowSums(), rowMeans(): Row-wise sums/means of data frame/matrix
+
+colSums(), colMeans(): Column-wise sums/means data frame/matrix
+
+cumsum(), cummean(): Cumulative sums and means of vector
+
+reshape(): Transposition/Reshaping of data frame (tricky interface) ?
+
+lapply(): Apply function element-wise, e.g., per column of data frame
+
+```{r}
+lapply(grid, quantile)
+```
+
+
+str(): Structure of object, e.g., of a data frame
+
+summary(): Summarizes object, e.g., each column in a data frame
+
+```{r}
+summary(grid)
+```
+
+
+mean(), median(), sd(), quantile(), min(), max(): Univariate statistics
+
+table(), prop.table(), addmargins(): Absolute and relative counts
+
+```{r}
+library(ggplot2)
+t <- table(diamonds$color) # count color occurences
+t
+t <- prop.table(t) # proportions
+t
+
+sum(t) # sum to 1
+```
+
+
+cor(), cov(): Bivariate statistics
+
+hist(), barplot(), boxplot(), plot(): Some plot functions
+```{r}
+y <- rnorm(100)
+x <- 1:100
+
+plot(x, y)
+hist(y)
+boxplot(y)
+barplot(1:10)
+```
+

@@ -596,29 +596,36 @@ prep_nn <- function(X, dense = x_dense, scaling = sc) {
   X_dense <- data.matrix(X[, dense, drop = FALSE])
   X_dense <- scale(X_dense, center = scaling$center, scale = scaling$scale)
   list(dense1 = X_dense, pu_loc = as.integer(X$pu_loc) - 1)
-}
+}                                  # integer encoded version
 
 # Does prep_nn() really work?
+# how does it look like?
 prep_nn(head(test, 1))
+# dense part at first, we now have a list of tables as input!
 
 # Trying to make things reproducible...
 k_clear_session()
 tensorflow::set_random_seed(469)
 
 # Inputs
+# dense in the sense: input are doubles
 input_dense <- layer_input(shape = length(x_dense), name = "dense1")
+# integer encoded pickup-locations
 input_pu_loc <- layer_input(shape = 1, name = "pu_loc")
 
 # Embedding of pu_loc
 emb_pu_loc <- input_pu_loc %>% 
+                          # bug in R implementation (+1 always required)
+                          # aggressive -> output_dim (represented by just a single double)
   layer_embedding(input_dim = nlevels(train$pu_loc) + 1, output_dim = 10) %>% 
-  layer_flatten()
+  layer_flatten() # this layer reduces the dimension (makes the output tabular)
 
 # Combine dense input and embedding, and add dense layers
+# input starts with list!
 outputs <- list(input_dense, emb_pu_loc) %>%
-  layer_concatenate() %>% 
-  layer_dense(100, activation = "relu") %>%
-  layer_dense(10, activation = "relu") %>% 
+  layer_concatenate() %>% # connect with other inputs
+  layer_dense(100, activation = "relu") %>% # parameter explosion
+  layer_dense(10, activation = "relu") %>% # pull it together
   layer_dense(1, activation = "linear")
 
 # Input
@@ -629,7 +636,7 @@ nn <- keras_model(inputs = inputs, outputs = outputs)
 summary(nn)
 
 nn %>% compile(
-  optimizer = optimizer_adam(learning_rate = 0.005),
+  optimizer = optimizer_adam(learning_rate = 0.005), # learning rate: there are tools to help us there
   loss = "mse"
 )
 
@@ -671,6 +678,7 @@ fl <- flashlight(
   metrics = list(RMSE = rmse, `R squared` = r_squared),
   predict_function = function(m, X)
     predict(m, prep_nn(X), batch_size = 50000, verbose = 0)
+          # we need the prep function, and batch_size increased (just for better results)
 )
 
 # Performance on test data
@@ -679,9 +687,13 @@ perf$data
 plot(perf, fill = "chartreuse4") + 
   labs(x = element_blank(), y = element_blank())
 
+# thats quite good, without tuning (just learning rate and activation function)
+
 # Permutation importance
 light_importance(fl, v = x) %>% 
-  plot(fill = "chartreuse4")
+  plot(fill = "chartreuse4") # IMPORTANT FOR EXAM
+
+# we only need a stable predict function (should also work if we restructure the data)
 
 # Partial dependence
 for (v in x) {
@@ -690,9 +702,19 @@ for (v in x) {
     labs(title = paste("PDP for", v), y = "Prediction") 
   print(p)
 }
+
+# PDP for tree-based models: not smooth
+# PDP for NN models: smooth .. (why?)
+
+# we see that pickup location is highly unordered! (one special location)
+
+# performance similar to lightgbm
+
 ```
 
 **Comment:** The resulting model performs quite similarly to the boosted trees model. As in the diamonds example above, we used an early-stopping callback on 20% of the training rows to automatically find a good number of epochs. And again, for simplicity, we did not refit the model on the full training data. Thus, the final model was trained on less rows than the LightGBM model.
+
+Pickup location not so important -> do we need 10 dimensions in embedding layer?
 
 # Neural Network Slang
 
@@ -732,6 +754,8 @@ Let $T(Y)$ be a quantity of interest, e.g., an average diamond price, claims fre
 
 Let's apply above scheme for diamond prices.
 
+We use trees (faster)
+
 ```{r}
 library(tidyverse)
 library(ranger)
@@ -742,9 +766,14 @@ library(withr)
 y <- "price"
 mean(diamonds[[y]])
 
+# interested in average diamond prices
+
 # STEP 2
 x <- c("carat", "color", "cut", "clarity")
 fl <- flashlight(model = NULL, y = y, data = diamonds, label = "any")
+
+# average price grouped by different features
+# carat is the most difficult one (we need binning)
 
 for (v in x) {
   light_profile(fl, v = v, type = "response") %>% 
@@ -757,6 +786,7 @@ with_seed(
   9838, 
   ix <- sample(nrow(diamonds), 0.8 * nrow(diamonds))
 )
+# train/test split
 
 fit <- ranger(
   reformulate(x, y), 
@@ -778,6 +808,11 @@ light_performance(fl)$data$value
 # Importance
 imp <- light_importance(fl, v = x)
 plot(imp, fill = "chartreuse4")
+
+# "everything comes from carat"
+
+# PDP/ response for carat is similar > really important
+# clarity: strange 
 
 # Add PDP to descriptive effect
 for (v in most_important(imp)) {

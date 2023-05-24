@@ -212,3 +212,45 @@ Prevent overfitting?
 
 ```
 
+
+
+PDP log_carat: one small place where it goes down
+bad for the model ("one additional bathroom -> lower price")
+-> solution: use constraints
+
+tree depth 1 = additive model (single split trees)
+tree depth 0 = constant model
+for boosting 6 is quite deep
+
+pdp is fixed (trick to fix zig zag)
+but does not work if we have a completely different pdp 
+
+
+5
+conceptual question.
+why do we need a model? at prediction time, we do not have access to the residuals ???Why???
+
+6
+
+learning rate effect on number of trees with early stopping
+higher learning rate -> faster
+
+min_child_weight should be small number
+
+there are package
+
+
+
+Exercise 6
+
+we need keras log (k_log) but division is okay
+derivatives is handled by tensor flow
+
+
+Important: do not log twice (log link) so the response is just the price
+
+
+OLS never bias on model scale
+Neural Network -> Bias
+Trees no bias
+

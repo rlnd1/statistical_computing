@@ -1,0 +1,334 @@
+---
+title: "R Cheatsheet"
+author: "Roland Widmer, 17-109-646"
+date: "2023-05-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Base R
+
+```{r}
+age = c(20, 23, 35) 
+name = c("Petra", "Peter", "Peterina") 
+female = c(TRUE, FALSE, TRUE) 
+df = data.frame(age, name, female)  
+```
+
+subset(): Select rows and columns of data frame
+
+```{r}
+subset(df, age > 23, select=name:female)
+```
+transform(): Add or overwrite columns in data frame
+```{r}
+transform(df, male = !female)
+```
+
+aggregate(), tapply(), rowsum(), by(): Grouped calculations
+
+```{r}
+aggregate(df$age, by = list(df$female), FUN="mean")
+
+tapply(df$age, df$female, mean)
+
+rowsum(df$age, c(1, 1, 2)) # not the same as rowSums
+    # group indicates the group for every row of x
+
+by(df$age, df$female, mean) # wrapper of tapply for df
+
+```
+
+ave(): Grouped transformations
+
+```{r}
+ave(df$age, df$female, FUN = mean)
+```
+
+rbind(), cbind(): Bind rows/columns of data frame/matrix
+
+```{r}
+cbind(rep(1,5), rep(2, 5))
+rbind(rep(1,5), rep(2, 5))
+```
+
+
+merge(): Join data frames by key
+
+```{r}
+profession <- c("Student", "Bar tender", "Fire fighter")
+
+df_prof <- data.frame(name, profession)
+
+merge(df, df_prof, by.x = "name", by.y = "name")
+```
+
+
+expand.grid(): Cross-join lists/data frames
+
+```{r}
+x <- 1:10
+y <- 1:10
+grid <- expand.grid(x, y) # cartesian product
+```
+
+
+head(), tail(): First/last few elements of object
+
+nrow(), ncol(), dim(): Number of rows/columns of data frame/matrix
+
+order(), rank(): Sort indices, ranks
+
+```{r}
+order(df_prof$profession, decreasing = TRUE)
+
+df_prof[order(df_prof$profession, decreasing = TRUE),] # sorted 
+
+v <- c(3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
+
+rank(v) # by default: mean!
+order(v)
+```
+
+
+rowSums(), rowMeans(): Row-wise sums/means of data frame/matrix
+
+colSums(), colMeans(): Column-wise sums/means data frame/matrix
+
+cumsum(), cummean(): Cumulative sums and means of vector
+
+```{r}
+v <- c(1, 2, 3)
+cumsum(v)
+cummin(v)
+```
+
+
+reshape(): Transposition/Reshaping of data frame (tricky interface) ?
+
+lapply(): Apply function element-wise, e.g., per column of data frame
+
+```{r}
+lapply(grid, quantile)
+```
+
+
+str(): Structure of object, e.g., of a data frame
+
+summary(): Summarizes object, e.g., each column in a data frame
+
+```{r}
+summary(grid)
+```
+
+
+mean(), median(), sd(), quantile(), min(), max(): Univariate statistics
+
+```{r}
+v <- c(1, 2, 3)
+median(v)
+sd(v)
+quantile(v)
+```
+
+
+table(), prop.table(), addmargins(): Absolute and relative counts
+
+```{r}
+library(ggplot2)
+t <- table(diamonds$color) # count color occurrences
+t
+addmargins(t)
+t <- prop.table(t) # proportions
+t
+
+addmargins(t)
+```
+
+
+cor(), cov(): Bivariate statistics
+
+```{r}
+x <- c(1, 2, 3)
+y <- c(2, 4, 6)
+cor(x, y)
+cov(x, y)
+```
+
+
+hist(), barplot(), boxplot(), plot(): Some plot functions
+```{r}
+y <- rnorm(100)
+x <- 1:100
+
+plot(x, y)
+hist(y)
+boxplot(y)
+barplot(1:10)
+```
+Multivariate plots
+```{r}
+x <- "color"
+boxplot(
+  reformulate(x, "price"), # we may use ~ notation too
+  data = diamonds
+)
+```
+
+## Tidyverse
+Pipe
+```{r}
+library(magrittr)
+diamonds$color %>% 
+  table() %>% 
+  prop.table() %>% 
+  barplot(col = "chartreuse4")
+```
+
+select(), filter(), arrange(), mutate(), summary()
+```{r}
+library(dplyr)
+diamonds %>%
+  select(c("color", "price")) %>%  # select columns (or color, price)
+  filter(price >= mean(price)) %>% 
+  arrange(desc(price)) %>% # multiple cols possible
+  mutate(expensive = price > 10000) %>% # create new column
+  summary()
+
+diamonds %>% 
+  summarize(
+    med_carat = median(carat), 
+    med_price = median(price)
+  )
+```
+
+-   `group_by()`, `ungroup()`: Groups the rows by levels of one or more columns. Plays well with other functions like `summarize()`or `mutate()`
+
+```{r}
+diamonds %>% 
+  select(color, price) %>% 
+  group_by(color) %>% 
+  mutate(mean = mean(price)) %>% # does not change the dimension of the table
+  ungroup() %>% 
+  head(2)
+
+```
+
+-   `bind_rows()`, `bind_cols()`: Bind data frames by row/column
+```{r}
+diamonds %>% select(price) %>% head(2) %>% 
+  bind_rows(c(price = 500)) %>% 
+  bind_cols(genuine = c(TRUE, TRUE, FALSE))
+```
+
+-   `left_join()`, `inner_join()`, `right_join`: Join by key
+An inner_join() only keeps observations from x that have a matching key in y.
+
+The most important property of an inner join is that unmatched rows in either input are not included in the result.
+```{r}
+library(dplyr)
+name <- c("Peter", "Petra", "Hanswurst")
+age <- c(20, 80, 90)
+df_age <- data.frame(name, age)
+
+df_prof %>% 
+  inner_join(df_age, by="name") # Peterina, Hanswurst is not part of the result
+df_prof %>% left_join(df_age, by="name") # Peterina is not part of the result
+# left: keeps everything on left side
+# right: keeps everything on right side
+```
+
+-   `slice()`: Select rows by position
+-   `pivot_wider()`, `pivot_longer()`: Reshape/transpose (in "[tidyr](https://tidyr.tidyverse.org/)", not "dplyr")
+```{r}
+diamonds %>% 
+  select(price, carat) %>% 
+  pivot_longer(everything()) %>%  # everything selects all variables
+  head()
+
+diamonds %>% 
+  select(price, clarity, color) %>% 
+  pivot_longer(!price, names_to = "key", values_to = "value") %>% 
+  head()
+```
+## ggplot2
+
++ operator (developed before the pipe operator!)
+
+Bar plot
+```{r}
+library(ggplot2)
+
+ggplot(data = diamonds, mapping = aes(x = color)) +
+  geom_bar(fill = "black")
+```
+
+Histogram
+```{r}
+ggplot(diamonds, aes(x = price)) +
+  geom_histogram(bins = 30) + 
+  ggtitle("Histogram")
+```
+Boxplot
+```{r}
+hstgr <- ggplot(diamonds, mapping = aes(x = color, y = price)) +
+  # ylim(c(0, 10000)) + excludes the larger elements, better:
+  coord_cartesian(ylim = c(0, 10000)) + 
+  geom_boxplot() +
+  theme_gray(base_size = 15) # larger text
+hstgr
+```
+Scatterplot
+```{r}
+p <- ggplot(diamonds, mapping = aes(x = carat, y = price)) +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() + # logarithmic scales
+  geom_smooth() # "regression"
+p
+```
+Grouped plots:
+```{r}
+p + facet_wrap(~ color)
+```
+Faceting + pivot_longer is useful!
+
+Use data in color:
+```{r}
+p <- ggplot(diamonds, mapping = aes(x = carat, y = price, color = clarity)) +
+  geom_point(alpha = 0.2) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) +
+  theme(legend.position = "top")
+```
+Plotly: Make the plots interactive:
+```{r}
+library(plotly)
+hstgr %>%  ggplotly() # magrittr pipe!
+```
+## Class
+```{r}
+class(x ~ y) # get class
+# generic plot function finds class of x ~ y and class corresponding method, i.e. graphics:::plot.formula (three : for internal methods), other methods: graphics:::plot.factor
+```
+Our own class
+```{r}
+# Function that creates an object of class "student"
+student <- function(name) {
+  out <- list(
+    name = name
+  )
+  class(out) <- "student"
+  out
+}
+me <- student("Michael Mayer")
+print.student <- function(x, ...) {
+  cat("Hi, I'm", x$name)
+  invisible(x) # do not output x itself
+}
+
+print(me)
+```
+

@@ -1,0 +1,127 @@
+---
+title: "Summary"
+author: "Roland Widmer"
+date: "2023-05-25"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 2 Statistical Inference
+replicate
+```{r}
+replicate(3, "hey")
+```
+
+z-confidence intervals for mu
+```{r}
+library(dplyr)
+
+set.seed(260)
+WaldCI <- function(alpha, mu.hat, se.hat) {
+  mu.hat + c(-1, 1) * qnorm(1 - alpha/2) * se.hat
+}
+
+n_sims <- 1000
+n <- 50
+mu <- 10
+# accuracy !!! for mean !!!
+replicate(n_sims, {
+    sample <- rnorm(n, mean=mu)
+    mu.hat <- mean(sample)
+    se.hat <- sd(sample) / sqrt(n) # important!
+    
+    ci <- WaldCI(0.05, mu.hat = mu.hat, se.hat = se.hat)
+    c(lci = ci[1], estimate = mu.hat, uci = ci[2])
+  }) %>% t() %>% data.frame() %>% 
+    mutate(ok = (lci <= mu) & (mu <= uci)) %>% # mu != estimate!
+    select(ok) %>% colMeans(as.numeric(ok)) 
+
+
+```
+Bootstrap
+Goal: resample with replacement to calculate an estimator of the standard error and/or confidence intervals (and bias)
+
+"However, there is the idea of a sampling distribution, which is a theoretical set of all possible estimates if the population were to be resampled. The theory states that, under certain conditions such as large sample sizes, the sampling distribution will be approximately normal, and the standard deviation of the distribution will be equal to the standard error."
+```{r}
+B <- 100
+n <- 100
+sample <- rexp(n)
+closed_form <- sd(sample)/sqrt(n)
+
+res = numeric(B) # better than c()
+for (i in 1:B) {
+  s <- sample(sample, replace = TRUE)
+  res[i] <- mean(s)
+}
+
+closed_form
+sd(res)
+```
+generic form with replicate:
+```{r}
+B <- 100
+s <- rnorm(400)
+functional <- function(sample) {
+  mean(sample)
+}
+
+boot <- replicate(B, functional(sample(s, replace=TRUE)))
+
+# std error
+sd(boot)
+
+# Wald CI:
+functional(s) + c(-1, 1) * qnorm(1 - 0.05/2) * sd(boot)
+
+# Percentile CI:
+quantile(boot, probs = c(0.05/2, 1 - 0.05/2))
+```
+Better CIs with boot:
+```{r}
+library(boot)
+
+set.seed(30)
+
+n <- 49
+x <- rexp(n)  # Population median is ln(2) / lambda = ln(2)
+
+boot_dist <- boot(x, statistic = function(x, id) median(x[id]), R = 9999)
+boot.ci(boot_dist)
+```
+
+Multiple group:
+- within group
+- long form (multivariate)
+
+Permutation tests
+Find empirical null hypothesis distribution to calculate p-values
+two sample comparison
+```{r}
+x1 <- rexp(50, rate=0.5)
+x2 <- rexp(100, rate=1)
+
+y <- c(y1, y2) # long form
+x <- rep(c("A", "B"), times = c(50, 100))
+
+B <- 1000
+statistic <- function(x, y) {
+  abs(mean(y[x=="A"]) - mean(y[x=="B"])) # strange construction, check (1:60)[x == "B"]
+}
+
+perm.ts <- replicate(B, statistic(sample(x), y))
+
+mean(perm.ts >= statistic(x, y))
+
+```
+Type 1 error (Prob. to wrongly reject H0) and Power (1 - Type 2 error) (Prob. to correctly reject wrong H0)
+```{r}
+# TODO
+```
+
+We can use permutation tests to replace almost any parametric or non-parametric test
+
+(In coin package)
+
+## 3 Linear models

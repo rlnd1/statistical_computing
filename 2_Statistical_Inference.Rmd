@@ -826,14 +826,17 @@ correlation or the R-squared of a linear regression. This allows to
 study and measure associations between two or more variables using the
 Bootstrap.
 
+TODO: what is multivariate? why does the other approach not work?
+
 ### Example: Pearson correlation
 
 In the following, we will estimate Bootstrap confidence intervals for
 the true Pearson correlation coefficient $\theta$ of two variables using
 both the standard normal and the percentile Bootstrap approach. The
 percentile Bootstrap CI has the advantage of being range-preserving,
-i.e., staying within $[-1, 1]$ (why?). We will compare the intervals
-with the classic approach assuming bivariate normality.
+i.e., staying within $[-1, 1]$ (why? since we calculate quantiles of the
+sampling distribution). We will compare the intervals with the classic
+approach assuming bivariate normality.
 
 ```{r}
 library(ggplot2)
@@ -1037,7 +1040,7 @@ x <- rep(c("A", "B"), times = c(m, n))
 statistic <- function(x, y) {
   # easier to calculate the p value afterwards if we use the abs(.)
   # no need for standardization
-  abs(mean(y[x == "B"]) - mean(y[x == "A"]))
+  abs(mean(y[x == "B"]) - mean(y[x == "A"])) # for two-sided
 }
 
 # Calculate approximate null distribution
@@ -1124,18 +1127,20 @@ pb <- txtProgressBar(max = nsim, style = 3)
 if (FALSE) {  # Set to TRUE to rerun
   for (i in 1:nsim) {
     y1 <- rexp(m, 1)
-    y2 <- rexp(n, 1 / (1 + shift))
-    y <- c(y1, y2)
+    y2 <- rexp(n, 1 / (1 + shift)) # Type 1 error: shift = 0 (H0 is true)
+    y <- c(y1, y2) # as before
     x <- rep(c("A", "B"), times = c(m, n))
 
     # t-tests: First for unequal variances
     result[i, "Welch"] <- t.test(y ~ x)$p.value <= 0.05
+    # if p.value is smaller than alpha then we reject H0 (wrong!) if type 1 error
+    # if power: we reject wrong H0 correctly
     result[i, "Student"] <- t.test(y ~ x, var.equal = TRUE)$p.value <= 0.05
     
     # Permutation test with B = 10000
     perm_dist <- replicate(1e4, statistic(sample(x), y))
     perm_p <- mean(perm_dist >= statistic(x, y))
-    result[i, "Perm"] <- perm_p <= 0.05
+    result[i, "Perm"] <- perm_p <= 0.05 # now with the p.values from perm test
 
     setTxtProgressBar(pb, i)
   }

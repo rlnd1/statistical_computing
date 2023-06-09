@@ -7,6 +7,9 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+```{r}
+
+```
 
 ## 2 Statistical Inference
 replicate
@@ -125,3 +128,161 @@ We can use permutation tests to replace almost any parametric or non-parametric 
 (In coin package)
 
 ## 3 Linear models
+Simple linear regression
+```{r}
+library(ggplot2)
+
+fit <- lm(price ~ carat, data = diamonds) # Y_price = aX_carat + b + epsilon
+summary(fit)
+intercept <- coef(fit)[[1]] # coef function to get coefficients
+slope <- coef(fit)[[2]]
+
+# Visualize the regression line
+ggplot(diamonds, aes(x = carat, y = price)) + 
+  geom_point(alpha = 0.2, shape = ".") +
+  coord_cartesian(xlim = c(0, 3), ylim = c(-3000, 20000)) + # clip chart
+  geom_abline(slope = slope, intercept = intercept)
+
+# Predictions for diamonds with 1.3 carat?
+predict(fit, data.frame(carat = 1.3))
+
+# By hand
+intercept + slope * 1.3
+```
+Intercept -2556 = price for diamond of 0 carat (makes no sense!)
+
+Predictive Performance (absolute performance):
+Mean squared error MSE or Root mean squared error RMSE (scale of Y)
+
+R squared (relative performance):
+```{r}
+# there are packages, but it is so simple
+mse <- function(y, pred) {
+  mean((y - pred)^2)
+}
+
+(MSE <- mse(diamonds$price, predict(fit, diamonds))) # we use predict to get fitted values
+(RMSE <- sqrt(MSE)) # this number we can interpret
+
+# constant model (we could also just calculate the average)
+empty_model <- lm(price ~ 1, data = diamonds)  # predictions equal mean(diamonds$price)
+MSE_empty <- mse(diamonds$price, predict(empty_model, diamonds))
+
+# R-squared
+1 - MSE/MSE_empty # if close to 1 good
+```
+
+Problems:
+- Missing values: Response - ignore, Covariate - replace with mean/most frequent value
+- Outliers: use log to reduce impact
+- Overfitting: n/p greater than 50
+- Collinearity: Ceteris paribus does not hold anymore. Perfect collinear covariates not allowed for algorithmic reasons. Detect by looking at correlation
+
+Categorical variables:
+- One-hot-encoding to get numerical values. No perfect collinearity -> remove one variable. "dummy encoding"
+- Interpretation: What does beta_k mean? Effect on E[Y] if we switch from reference category (the category without a variable) to the category k
+- ordinal categories -> integer encoding (if it makes sense)
+- small categories -> summarize as "other" to prevent overfitting
+```{r}
+library(ggplot2)
+
+# Turn ordered into unordered factor
+# if ordered: str(...) reports Ord.factor w/ 7 levels, Factor otherwise
+diamonds <- transform(diamonds, color = factor(color, ordered = FALSE))
+
+fit <- lm(price ~ carat + color, data = diamonds)
+summary(fit)
+```
+
+Flexibility
+Non-linear terms: Cubic, polynomial regression, spline regression
+```{r}
+library(tidyverse)
+# use poly not x, x^2, x^3 because it will do some orthogonalization
+fit <- lm(price ~ poly(carat, 3), data = diamonds)
+```
+Attention to extrapolated areas
+
+Interaction terms
+Remove additivity, caution overfitting!
+```{r}
+lm(price ~ carat * color, data = diamonds)
+```
+
+Transformations of covariates:
+We can even interpret the coefficient regarding the untransformed X:
+"A 1% increase in feature $X$ leads to an increase in $\mathbb E(Y\mid x)$ of about $\beta/100$."
+
+Usual interpretation still works: "we can say that a one-point increase in log(carat) leads to a expected price increase of 5836 USD"
+
+"taking logarithms of covariates not only deals with outliers, it also offers us the possibility to talk about percentages"
+```{r}
+fit <- lm(price ~ log(carat), data = diamonds)
+
+# ggplot(to_plot, aes(x = log(carat), y = price)) # log scale in ggplot
+```
+
+Logarithmic response:
+The effect $\beta$ tells us by how much percentage we can expect $Y$ to change when increasing the value of feature $X$ by 1. Thus, a logarithmic response leads to a multiplicative instead of an additive model.
+
+"A one point increase in feature $X$ is associated with a relative increase in $\mathbb E(Y\mid x)$ of about $\beta \cdot 100\%$."
+
+ predictions backtransformed to the scale of $Y$ are biased (but not in log space!) -> use GLMs
+
+```{r}
+library(tidyverse)
+
+fit <- lm(log(price) ~ log(carat), data = diamonds)
+summary(fit)
+
+to_plot <- data.frame(carat = seq(0.3, 2.5, by = 0.1)) %>% 
+  mutate(price = exp(predict(fit, .)))
+
+# log-log-scale
+ggplot(to_plot, aes(x = log(carat), y = log(price))) +
+  geom_point(data = diamonds, shape = ".", alpha = 0.2, color = "chartreuse4") + 
+  geom_line() + # why does it take to_plot? as in pipe!
+  geom_point() +
+  coord_cartesian(x = log(c(0.3, 3))) +
+  ggtitle("Log-log scale")
+```
+GLMs:
+
+https://towardsdatascience.com/generalized-linear-models-9cbf848bb8ab
+
+```{r}
+fit <- glm(
+  numclaims ~ veh_value + veh_body + veh_age + gender + area + agecat,
+  data = dataCar, 
+  family = poisson(link = "log")
+)
+summary(fit)
+
+# Bias on original scale?
+mean(predict(fit, type = "response")) / mean(dataCar$numclaims) - 1
+# mean does exactly match -> no bias
+```
+
+Interpretation
+- identity link: as in linear regression
+- log link: A one-point increase in $X$ is associated with a relative increase in $\mathbb E(Y)$ of $e^{\beta}-1 \approx \beta \cdot 100\%$. The derivation is exactly as we have seen for linear regression, except that we now start with $\log(\mathbb E(Y))$ instead of $\mathbb E(\log(Y))$, making the former calculations mathematically sound. Using a GLM with log link is therefore the cleaner way to produce a multiplicative model for $\mathbb E(Y)$ than to log transform the response in a linear regression.
+-  There is no easy way to interpret the coefficients on the original probability scale.
+
+Logistic regression
+```{r}
+fit <- glm(
+  clm ~ veh_value + veh_body + veh_age + gender + area + agecat,
+  data = dataCar, 
+  family = binomial(link = "logit")
+)
+```
+
+Modeling large data:
+- Apache Parquet improved csv
+- Apache Arrow, available since 2016, is a language-independent standard for in-memory processing and transport of data
+- The data.table package is an R package for working with large data in an efficient way.
+- H2O is an ML software bundle developed by h2o.ai for in-memory cluster computing. (in Java)
+
+
+Taxi example
+TODO

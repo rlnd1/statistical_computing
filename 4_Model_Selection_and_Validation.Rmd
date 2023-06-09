@@ -16,6 +16,8 @@ bibliography: biblio.bib
 link-citations: yes
 editor_options: 
   chunk_output_type: console
+  markdown: 
+    wrap: 72
 knit: (function(input, ...) {rmarkdown::render(input, output_dir = "docs")})
 ---
 
@@ -30,35 +32,72 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-In the previous chapter, we have met performance measures like the RMSE or the total deviance to measure how good our models are. Unfortunately, we cannot fully rely on these values due to overfitting: The more our models overfit, the less we can trust in their "in-sample" performance, i.e., the performance on the data used to calculate the models. Selecting models based on their in-sample performance is equally bad. Overfitting should not be rewarded!
+In the previous chapter, we have met performance measures like the RMSE
+or the total deviance to measure how good our models are. Unfortunately,
+we cannot fully rely on these values due to overfitting: The more our
+models overfit, the less we can trust in their "in-sample" performance,
+i.e., the performance on the data used to calculate the models.
+Selecting models based on their in-sample performance is equally bad.
+Overfitting should not be rewarded!
 
-In this chapter, we will meet ways to estimate the performance of a model in a fair way and use it to select the best model among alternatives. They are all based on data splitting techniques, where the models are evaluated on fresh data not used for model calculation. A fantastic reference for this chapter is @hastie01statisticallearning. 
+In this chapter, we will meet ways to estimate the performance of a
+model in a fair way and use it to select the best model among
+alternatives. They are all based on data splitting techniques, where the
+models are evaluated on fresh data not used for model calculation. A
+fantastic reference for this chapter is @hastie01statisticallearning.
 
-Before introducing these techniques, we will fix some notation and meet a competitor of the linear model.
+Before introducing these techniques, we will fix some notation and meet
+a competitor of the linear model.
 
 Notation:
 
-- Loss function $L$: Used to measure loss of single observation, e.g. the squared error $L(y, z) = (y - z)^2$.
-- Total loss $Q(f, D) = \sum_{(y_i, \boldsymbol x_i) \in D} L(y_i, f(\boldsymbol x_i))$ of a data set $D$, e.g. the sum of squared errors. Used as objective criterion to fit $f$ on data $D$. Sometimes, the objective also contains a penalty term.
-- Average loss $\bar Q(f, D) = Q(f, D) / |D|$, e.g. the mean-squared error. Easier-to-read version of $Q$ as it does not grow with the sample size $|D|$.
-- Performance measure or evaluation metric $S(f, D)$ of interest, often $S = \bar Q$ or a function of it, e.g. the RMSE. Used to compare models or select hyper-parameters. Ideally consistent with $Q$.
+-   Loss function $L$: Used to measure loss of single observation, e.g.
+    the squared error $L(y, z) = (y - z)^2$.
+-   Total loss
+    $Q(f, D) = \sum_{(y_i, \boldsymbol x_i) \in D} L(y_i, f(\boldsymbol x_i))$
+    of a data set $D$, e.g. the sum of squared errors. Used as objective
+    criterion to fit $f$ on data $D$. Sometimes, the objective also
+    contains a penalty term.
+-   Average loss $\bar Q(f, D) = Q(f, D) / |D|$, e.g. the mean-squared
+    error. Easier-to-read version of $Q$ as it does not grow with the
+    sample size $|D|$.
+-   Performance measure or evaluation metric $S(f, D)$ of interest,
+    often $S = \bar Q$ or a function of it, e.g. the RMSE. Used to
+    compare models or select hyper-parameters. Ideally consistent with
+    $Q$.
 
-While loss functions are used by the algorithm to *fit* the model, the evaluation metric helps to measure performance and to select models.
+While loss functions are used by the algorithm to *fit* the model, the
+evaluation metric helps to measure performance and to select models.
 
 # Nearest-neighbor
 
-A very simple and intuitive alternative to the linear model is the $k$-nearest-neighbor approach, originally introduced by Evelyn Fix and J. L. Hodges in an unpublished technical report in 1951. It can be applied for both regression and classification and works without fitting anything. The prediction for an observation is obtained by 
+A very simple and intuitive alternative to the linear model is the
+$k$-nearest-neighbor approach, originally introduced by Evelyn Fix and
+J. L. Hodges in an unpublished technical report in 1951. It can be
+applied for both regression and classification and works without fitting
+anything. The prediction for an observation is obtained by
 
-1. searching the closest $k$ neighbors in the data set and then 
-2. combining their responses. 
+1.  searching the closest $k$ neighbors in the data set and then
+2.  combining their responses.
 
-By "nearest" we usually mean Euclidean distance in the covariate space. If covariates are not on the same scale, it makes sense to *standardize* them first by subtracting the mean and dividing by the standard deviation. Otherwise, distances would be dominated by the covariate on the largest scale. Categorical features need to be one-hot- or integer-encoded first. Note that one-hot-encoded covariates may or may not be standardized.
+By "nearest" we usually mean Euclidean distance in the covariate space.
+If covariates are not on the same scale, it makes sense to *standardize*
+them first by subtracting the mean and dividing by the standard
+deviation. Otherwise, distances would be dominated by the covariate on
+the largest scale. Categorical features need to be one-hot- or
+integer-encoded first. Note that one-hot-encoded covariates may or may
+not be standardized.
 
-For regression tasks, the responses of the $k$ nearest neighbors are often combined by computing their arithmetic mean. For classification tasks, they are condensed to their most frequent value or by providing class probabilities.
+For regression tasks, the responses of the $k$ nearest neighbors are
+often combined by computing their arithmetic mean. For classification
+tasks, they are condensed to their most frequent value or by providing
+class probabilities.
 
 ## Example
 
-What prediction (on logarithmic price scale) would we get with 5-nearest-neighbor regression for the 10'000th row of the diamonds data set?
+What prediction (on logarithmic price scale) would we get with
+5-nearest-neighbor regression for the 10'000th row of the diamonds data
+set?
 
 ```{r}
 library(ggplot2)
@@ -81,6 +120,7 @@ diamonds[10000, c("price", "carat", x)]
 
 # Its prediction
 knn.reg(X, test = X[10000, ], k = 5, y = diamonds[[y]])
+# reg = regression
 
 # this value lives in log space, so use exp(...) to get other value
 
@@ -88,31 +128,55 @@ knn.reg(X, test = X[10000, ], k = 5, y = diamonds[[y]])
 neighbors <- c(knnx.index(X, X[10000, , drop = FALSE], k = 5))
 diamonds[neighbors, ]
 ```
-We see that they are quite similar in most of the covariates
-Ugly: the predicted diamond is a neighbor (overfitting)
-Ugly: probably the same diamond multiple times in the table! (problem of the diamond data). We have to keep that in mind.
 
+We see that they are quite similar in most of the covariates Ugly: the
+predicted diamond is a neighbor (overfitting) Ugly: probably the same
+diamond multiple times in the table! (problem of the diamond data). We
+have to keep that in mind.
 
-**Comments** 
+**Comments**
 
-- The five nearest diamonds are extremely similar. One of them is the observation of interest itself, introducing a relevant amount of overfitting.
-- The average log price of these five observations gives us the nearest-neighbor prediction for the 10'000th diamond.
-- Would we get better results for a different choice of the number of neighbors $k$?
-- Three lines are identical up to the perspective variables (`depth`, `table`, `x`, `y`, `z`). These rows most certainly represent the same diamond, which leads to an additional overfit. We need to keep this problematic aspect of the diamonds data in mind.
+-   The five nearest diamonds are extremely similar. One of them is the
+    observation of interest itself, introducing a relevant amount of
+    overfitting.
+-   The average log price of these five observations gives us the
+    nearest-neighbor prediction for the 10'000th diamond.
+-   Would we get better results for a different choice of the number of
+    neighbors $k$?
+-   Three lines are identical up to the perspective variables (`depth`,
+    `table`, `x`, `y`, `z`). These rows most certainly represent the
+    same diamond, which leads to an additional overfit. We need to keep
+    this problematic aspect of the diamonds data in mind.
 
-**Motivation for this chapter:** In-sample, a 1-nearest-neighbor regression predicts without error, a consequence of pure overfitting. This hypothetical example indicates that in-sample performance is often not worth a penny. Models need to be evaluated on fresh, independent data not used for model calculation. This leads us to *simple validation*.
+**Motivation for this chapter:** In-sample, a 1-nearest-neighbor
+regression predicts without error, a consequence of pure overfitting.
+This hypothetical example indicates that in-sample performance is often
+not worth a penny. Models need to be evaluated on fresh, independent
+data not used for model calculation. This leads us to *simple
+validation*.
 
 # Simple Validation
 
-With simple validation, the original data set is partitioned into a *training* data set $D_\text{train}$ used to calculate the models and a separate *validation* data set $D_\text{valid}$ used to estimate the true model performance and/or to select models. Typically, $10\% - 30\%$ of rows are used for validation. 
+With simple validation, the original data set is partitioned into a
+*training* data set $D_\text{train}$ used to calculate the models and a
+separate *validation* data set $D_\text{valid}$ used to estimate the
+true model performance and/or to select models. Typically, $10\% - 30\%$
+of rows are used for validation.
 
-We can use the validation performance $S(\hat f, D_\text{valid})$ to compare *algorithms* (e.g., linear regression versus $k$-nearest-neighbor) and also to choose their *hyperparameters* like the $k$ of $k$-nearest-neighbor.
+We can use the validation performance $S(\hat f, D_\text{valid})$ to
+compare *algorithms* (e.g., linear regression versus
+$k$-nearest-neighbor) and also to choose their *hyperparameters* like
+the $k$ of $k$-nearest-neighbor.
 
-Furthermore, the performance difference $S(\hat f, D_\text{valid}) - S(\hat f, D_\text{train})$ gives an impression on the amount of overfitting (or rather of the *optimism*). Ideally, the difference is small.
+Furthermore, the performance difference
+$S(\hat f, D_\text{valid}) - S(\hat f, D_\text{train})$ gives an
+impression on the amount of overfitting (or rather of the *optimism*).
+Ideally, the difference is small.
 
 ## Example
 
-We now use a 80%/20% split on the diamonds data to calculate the RMSE of 5-nearest-neighbor for both the training and the validation data.
+We now use a 80%/20% split on the diamonds data to calculate the RMSE of
+5-nearest-neighbor for both the training and the validation data.
 
 ```{r}
 library(ggplot2)
@@ -162,7 +226,10 @@ cat("Validation RMSE:", RMSE(y_valid, pred_valid))
 
 We see quite a difference on RMSE for train/validation data.
 
-**Comment:** Validation RMSE is substantially worse than training RMSE, a clear sign of overfitting. However, it is still much better than the (full-sample) performance of linear regression (residual standard error was 0.1338).
+**Comment:** Validation RMSE is substantially worse than training RMSE,
+a clear sign of overfitting. However, it is still much better than the
+(full-sample) performance of linear regression (residual standard error
+was 0.1338).
 
 Can we find a $k$ with better validation RMSE?
 
@@ -195,45 +262,66 @@ ggplot(aes(x = k, y = RMSE, group = Data, color = Data)) +
   geom_line()
 ```
 
-which validation performance is the best? for k = 6
-validation performance is always worse than training performance (clear, since the predicted value is a neighbor too)
-typical plot: there is an optimum, not k the bigger the better
-why k=1 not 0 for training data? strange, because multiple diamonds with the same covariates -> random selection of one?
-typical exam question
+which validation performance is the best? for k = 6 validation
+performance is always worse than training performance (clear, since the
+predicted value is a neighbor too) typical plot: there is an optimum,
+not k the bigger the better why k=1 not 0 for training data? strange,
+because multiple diamonds with the same covariates -\> random selection
+of one? typical exam question
 
 **Comments**
 
-- The amount of overfitting decreases for growing $k$, which makes sense.
-- Selecting $k$ based on the training data would lead to a suboptimal model.
-- Based on the validation data, we would choose $k=6$. It has a minimal RMSE of 11.29%.
-- Why is the RMSE on the training data not 0 for 1-nearest-neighbor?
-- Why is it problematic that some diamonds appear multiple times in the dataset?
+-   The amount of overfitting decreases for growing $k$, which makes
+    sense.
+-   Selecting $k$ based on the training data would lead to a suboptimal
+    model.
+-   Based on the validation data, we would choose $k=6$. It has a
+    minimal RMSE of 11.29%.
+-   Why is the RMSE on the training data not 0 for 1-nearest-neighbor?
+-   Why is it problematic that some diamonds appear multiple times in
+    the dataset?
 
 # Cross-Validation (CV)
 
-If our data set is large and training takes long, then the simple validation strategy presented above is usually good enough. For smaller data sets or when training is fast, there is a better alternative that uses the data in a more economical way and makes more robust decisions. It is called $K$-fold cross-validation and works as follows:
+If our data set is large and training takes long, then the simple
+validation strategy presented above is usually good enough. For smaller
+data sets or when training is fast, there is a better alternative that
+uses the data in a more economical way and makes more robust decisions.
+It is called $K$-fold cross-validation and works as follows:
 
-1. Split the data into $K$ pieces $D = \{D_1, \dots, D_K\}$ called *folds*. Typical values for $K$ are five or ten.
-2. Set aside one of the pieces ($D_k$) for validation.
-3. Fit the model $\hat f_k$ on all other pieces, i.e., on $D \setminus D_k$.
-4. Calculate the model performance $\hat S_k = S(\hat f_k, D_k)$ on the validation data $D_k$.
-5. Repeat Steps 2 to 4 until each piece was used for validation once.
-6. The average of the $K$ model performances yields the *CV performance* 
-  $$
-    \hat S_{CV} = \frac{1}{K} \sum_{k = 1}^K \hat S_k.
-  $$
+1.  Split the data into $K$ pieces $D = \{D_1, \dots, D_K\}$ called
+    *folds*. Typical values for $K$ are five or ten.
+2.  Set aside one of the pieces ($D_k$) for validation.
+3.  Fit the model $\hat f_k$ on all other pieces, i.e., on
+    $D \setminus D_k$.
+4.  Calculate the model performance $\hat S_k = S(\hat f_k, D_k)$ on the
+    validation data $D_k$.
+5.  Repeat Steps 2 to 4 until each piece was used for validation once.
+6.  The average of the $K$ model performances yields the *CV
+    performance* $$
+     \hat S_{CV} = \frac{1}{K} \sum_{k = 1}^K \hat S_k.
+      $$
 
-The CV performance is a good basis to choose the best and final model among alternatives. **The final model is re-trained on all folds.**
+The CV performance is a good basis to choose the best and final model
+among alternatives. **The final model is re-trained on all folds.**
 
 **Notes**
 
-- The "best" model is typically the one with best CV performance. Depending on the situation, it could also be a model with "good CV performance and not too heavy overfit compared to in-sample performance" or some other reasonable criterion.
-- The standard deviation of $\hat S_1, \dots, \hat S_K$, and/or the standard error of $\hat S_{CV}$ gives an impression on the stability of the results.
-- If cross-validation is fast, you can repeat the process for additional data splits. Such *repeated* cross-validation leads to even more robust results.
+-   The "best" model is typically the one with best CV performance.
+    Depending on the situation, it could also be a model with "good CV
+    performance and not too heavy overfit compared to in-sample
+    performance" or some other reasonable criterion.
+-   The standard deviation of $\hat S_1, \dots, \hat S_K$, and/or the
+    standard error of $\hat S_{CV}$ gives an impression on the stability
+    of the results.
+-   If cross-validation is fast, you can repeat the process for
+    additional data splits. Such *repeated* cross-validation leads to
+    even more robust results.
 
 ## Example
 
-We now use five-fold CV on the diamonds data to find the optimal $k$ of $k$-nearest-neighbor, i.e., we *tune* our model.
+We now use five-fold CV on the diamonds data to find the optimal $k$ of
+$k$-nearest-neighbor, i.e., we *tune* our model.
 
 ```{r}
 library(ggplot2)
@@ -304,51 +392,85 @@ ggplot(paramGrid, aes(x = k, y = RMSE)) +
   ggtitle("Performance by cross-validation")
 ```
 
-Meta seach: caret package
-mlr3: object oriented (R6) approach (Python, C++)
-tidymodels (strange but modern)
+Meta seach: caret package mlr3: object oriented (R6) approach (Python,
+C++) tidymodels (strange but modern)
 
 Often we can delegate it to other function
 
-Curve: k is from NN, so probably 7 seems to be the best choice
-Repeated CV necessary? Look at SE, SD.
+Curve: k is from NN, so probably 7 seems to be the best choice Repeated
+CV necessary? Look at SE, SD.
 
-**Comment:** Using 7 neighbors seems to be the best choice regarding CV RMSE. Again, the fact that certain diamonds show up multiple times leaves a slightly bad feeling. Should we really trust these results?
+**Comment:** Using 7 neighbors seems to be the best choice regarding CV
+RMSE. Again, the fact that certain diamonds show up multiple times
+leaves a slightly bad feeling. Should we really trust these results?
 
 ## Grid Search
 
-In the above example, we have systematically compared the CV-performance of $k$-nearest-neighbor by iterating over a grid of possible values for $k$. Such strategy to *tune* models, i.e., to select hyperparameters of a model is called **grid search CV**. In the next chapter, we will meet situations where multiple parameters have to be optimized simultaneously. Then, the number of parameter combinations and the grid size explode. To save time, we could evaluate only a random subset of parameter combinations, an approach called **randomized search CV**.
+In the above example, we have systematically compared the CV-performance
+of $k$-nearest-neighbor by iterating over a grid of possible values for
+$k$. Such strategy to *tune* models, i.e., to select hyperparameters of
+a model is called **grid search CV**. In the next chapter, we will meet
+situations where multiple parameters have to be optimized
+simultaneously. Then, the number of parameter combinations and the grid
+size explode. To save time, we could evaluate only a random subset of
+parameter combinations, an approach called **randomized search CV**.
 
 # Test Data and Final Workflow
 
-Modeling often requires many decisions to be made. Even when guided by (cross-)validation, each decision tends to make the final model look better than it effectively is, an effect that can be called *overfitting on the validation data*. 
+Modeling often requires many decisions to be made. Even when guided by
+(cross-)validation, each decision tends to make the final model look
+better than it effectively is, an effect that can be called *overfitting
+on the validation data*.
 
-As a consequence, we often do not know how well the final model will perform in reality. As a solution, we can set aside a small *test* data set $D_\text{test}$ used to assess the performance $S(\hat f, D_\text{test})$ of the *final* model $\hat f$. A size of $5\% - 20\%$ is usually sufficient. 
-It is important to look at the test data just once at the very end of the modeling process - after each decision has been made. The difference between $S(\hat f, D_\text{test})$ and the corresponding (cross-)validation score gives an impression of the validation optimism/overfit.
+As a consequence, we often do not know how well the final model will
+perform in reality. As a solution, we can set aside a small *test* data
+set $D_\text{test}$ used to assess the performance
+$S(\hat f, D_\text{test})$ of the *final* model $\hat f$. A size of
+$5\% - 20\%$ is usually sufficient. It is important to look at the test
+data just once at the very end of the modeling process - after each
+decision has been made. The difference between
+$S(\hat f, D_\text{test})$ and the corresponding (cross-)validation
+score gives an impression of the validation optimism/overfit.
 
-Note: Such an additional test data set is only necessary if one uses the validation data set to *make decisions*. If the validation data set is only used to estimate the true performance of a model, then we do not need this additional data set. In that case, the terms "validation data" and "test data" are interchangeable.
+Note: Such an additional test data set is only necessary if one uses the
+validation data set to *make decisions*. If the validation data set is
+only used to estimate the true performance of a model, then we do not
+need this additional data set. In that case, the terms "validation data"
+and "test data" are interchangeable.
 
-Depending on whether one is performing simple validation or cross-validation, the typical workflow is as follows:
+Depending on whether one is performing simple validation or
+cross-validation, the typical workflow is as follows:
 
 **Workflow A**
 
-1. Split data into train/valid/test, e.g., by ratios 60%/20%/20%.
-2. Train different models on the training data and assess their performance on the validation data. Choose the best model, re-train it on the combination of training and validation data, and call it "final model".
-3. Assess performance of the final model on the test data.
+1.  Split data into train/valid/test, e.g., by ratios 60%/20%/20%.
+2.  Train different models on the training data and assess their
+    performance on the validation data. Choose the best model, re-train
+    it on the combination of training and validation data, and call it
+    "final model".
+3.  Assess performance of the final model on the test data.
 
 **Workflow B**
 
-1. Split data into train/test, e.g., by ratios 80%/20%.
-2. Evaluate and tune different models by $K$-fold cross-validation on the training data. Select the best model and re-train it on the full training data.
-3. Assess performance of the final model on the test data.
+1.  Split data into train/test, e.g., by ratios 80%/20%.
+2.  Evaluate and tune different models by $K$-fold cross-validation on
+    the training data. Select the best model and re-train it on the full
+    training data.
+3.  Assess performance of the final model on the test data.
 
-The only difference between the two workflows is whether simple validation or cross-validation is used for decision making.
+The only difference between the two workflows is whether simple
+validation or cross-validation is used for decision making.
 
-Remark: For simplicity, Workflow A is sometimes done without refitting on the combination of training and validation data. In that case, the final model is fitted on the training data only.
+Remark: For simplicity, Workflow A is sometimes done without refitting
+on the combination of training and validation data. In that case, the
+final model is fitted on the training data only.
 
 ## Example: Workflow B
 
-We will now follow Workflow B for our diamond price model. We will (1) tune the $k$ of our nearest-neighbor regression and (2) compare its result with a linear regression. The model with best CV performance will be evaluated on the test data.
+We will now follow Workflow B for our diamond price model. We will (1)
+tune the $k$ of our nearest-neighbor regression and (2) compare its
+result with a linear regression. The model with best CV performance will
+be evaluated on the test data.
 
 not only tune k but also give linear regression a chance:
 
@@ -439,39 +561,53 @@ pred <- knn.reg(X_train, test = X_test, k = 6, y = y_train)$pred
 # Test performance for the best model
 RMSE(y_test, pred)
 ```
-With caret, mlr3, tidymodels -> reduce code by around 50%.
-but not 5 loc!
-a bit of unfairness: nearest neighbor had more chances than linear regression. We could add splines, interactions, ... . But it would be really hard to beat the NN.
+
+With caret, mlr3, tidymodels -\> reduce code by around 50%. but not 5
+loc! a bit of unfairness: nearest neighbor had more chances than linear
+regression. We could add splines, interactions, ... . But it would be
+really hard to beat the NN.
 
 Statistician would use p-values. But often we don't have p-values.
 
-**Comments** 
+**Comments**
 
-- 6-nearest-neighbor regression performs clearly better than linear regression.
-- Its performance on the independent test data is even better than CV suggests.
+-   6-nearest-neighbor regression performs clearly better than linear
+    regression.
+-   Its performance on the independent test data is even better than CV
+    suggests.
 
 # Excursion: Ridge Regression
 
-A ridge regression is a penalized linear regression. It assumes the same model equation 
-$$
+A ridge regression is a penalized linear regression. It assumes the same
+model equation $$
   \mathbb E(Y \mid \boldsymbol x) = f(\boldsymbol x) = \beta_0 + \beta_1 x^{(1)} + \dots + \beta_p x^{(p)}
-$$
-as a "normal" linear regression, but with an L2 penalty added to the least squares criterion:
-$$
+$$ as a "normal" linear regression, but with an L2 penalty added to the
+least squares criterion: $$
   Q(f, D_{\text{train}}) = \sum_{(y_i, \boldsymbol x_i) \in D_\text{train}} (y_i - f(\boldsymbol x_i))^2 + \lambda \sum_{j = 1}^p \beta_j^2.
-$$
-Adding such an L2 penalty has the effect of pulling the coefficients slightly towards zero, fighting overfitting. The optimal penalization strength is controlled by $\lambda \ge 0$, which usually is determined by simple validation or cross-validation.
+$$ Adding such an L2 penalty has the effect of pulling the coefficients
+slightly towards zero, fighting overfitting. The optimal penalization
+strength is controlled by $\lambda \ge 0$, which usually is determined
+by simple validation or cross-validation.
 
 **Remarks**
 
-- To avoid biased average predictions, the penalty is usually not applied to the intercept.
-- To make penalization fair between covariates of different scale, the regressors are often standardized to variance 1. Most software do this internally.
-- A model using an L1 penalty $\lambda \sum_{j = 1}^p |\beta_j|$ is called a Lasso model. A model with both L1 and L2 penalties is an "elastic net" model.
+-   To avoid biased average predictions, the penalty is usually not
+    applied to the intercept.
+-   To make penalization fair between covariates of different scale, the
+    regressors are often standardized to variance 1. Most software do
+    this internally.
+-   A model using an L1 penalty $\lambda \sum_{j = 1}^p |\beta_j|$ is
+    called a Lasso model. A model with both L1 and L2 penalties is an
+    "elastic net" model.
 
 ## Example: Taxi
 
-To show an example of ridge regression and Workflow A, we revisit the taxi trip example of the last chapter. We first split the data into 70%/20%/10% training/validation/test data. 
-Then, we let H2O use the validation data to find the optimal L2 penalty. Using this penalty, the final model will be fitted on the combination of training and validation data, and then evaluated on the 10% test data.
+To show an example of ridge regression and Workflow A, we revisit the
+taxi trip example of the last chapter. We first split the data into
+70%/20%/10% training/validation/test data. Then, we let H2O use the
+validation data to find the optimal L2 penalty. Using this penalty, the
+final model will be fitted on the combination of training and validation
+data, and then evaluated on the 10% test data.
 
 ```{r, eval=FALSE}
 library(arrow)
@@ -539,67 +675,121 @@ fit_final <- h2o.glm(
 fit_final  # Test R^2: 0.7814
 ```
 
-**Comment:** According to simple validation, no L2 penalty is needed. Thus, the final model is fitted without penalty on the pooled 90% training and validation data. Its test R-squared is very similar to the validation R-squared, indicating that there is no problematic overfit on the validation data. Why adding a penalty did not help to improve the model? Usually, ridge regression shines when the $n/p$ ratio is small. In our case, however, it is very large.
+**Comment:** According to simple validation, no L2 penalty is needed.
+Thus, the final model is fitted without penalty on the pooled 90%
+training and validation data. Its test R-squared is very similar to the
+validation R-squared, indicating that there is no problematic overfit on
+the validation data. Why adding a penalty did not help to improve the
+model? Usually, ridge regression shines when the $n/p$ ratio is small.
+In our case, however, it is very large.
 
 # Random Splitting?
 
-The data is often split *randomly* into partitions or folds. As long as the rows are *independent*, this leads to honest estimates of model performance.
+The data is often split *randomly* into partitions or folds. As long as
+the rows are *independent*, this leads to honest estimates of model
+performance.
 
-However, if the rows are not independent, e.g. for time series data or grouped data, such a strategy is flawed and usually leads to overly optimistic results. **This is a common mistake in modeling.**
+However, if the rows are not independent, e.g. for time series data or
+grouped data, such a strategy is flawed and usually leads to overly
+optimistic results. **This is a common mistake in modeling.**
 
 ## Time-series data
 
-When data represents a time series, splitting is best done in a way that does not destroy the temporal order. For simple validation, e.g., the first 80% of rows could be used for training and the remaining 20% for validation. The specific strategy depends on how the model will be applied.
+When data represents a time series, splitting is best done in a way that
+does not destroy the temporal order. For simple validation, e.g., the
+first 80% of rows could be used for training and the remaining 20% for
+validation. The specific strategy depends on how the model will be
+applied.
 
 ## Grouped data
 
-Often, data is grouped or clustered by some (hopefully known) ID variable, e.g.,
+Often, data is grouped or clustered by some (hopefully known) ID
+variable, e.g.,
 
-- multiple rows belong to the same patient/customer or
-- duplicated rows (accidental or not). 
+-   multiple rows belong to the same patient/customer or
+-   duplicated rows (accidental or not).
 
-Then, instead of distributing *rows* into partitions, we should distribute *groups*/IDs in order to not destroy the data structure and to get honest performance estimates. We speak of *grouped splitting* and *group K-fold CV*. 
+Then, instead of distributing *rows* into partitions, we should
+distribute *groups*/IDs in order to not destroy the data structure and
+to get honest performance estimates. We speak of *grouped splitting* and
+*group K-fold CV*.
 
-In our example with diamonds data, it would be useful to have a column with diamond "id" that could be used for grouped splitting. (How would you create a proxy for this?)
+In our example with diamonds data, it would be useful to have a column
+with diamond "id" that could be used for grouped splitting. (How would
+you create a proxy for this?)
 
 ## Stratification
 
-*If rows are independent*, there is a variant of random splitting that can provide slightly better models: *stratified splitting*. With stratified splitting or stratified K-fold CV, rows are split to enforce similar distribution of a key variable across partitions/folds. Stratified splitting is often used when the response variable is binary and unbalanced. Unbalanced means that the proportion of "1" is close to 0 or 1.
+*If rows are independent*, there is a variant of random splitting that
+can provide slightly better models: *stratified splitting*. With
+stratified splitting or stratified K-fold CV, rows are split to enforce
+similar distribution of a key variable across partitions/folds.
+Stratified splitting is often used when the response variable is binary
+and unbalanced. Unbalanced means that the proportion of "1" is close to
+0 or 1.
 
 # Excursion: SQL and Spark
 
-> Data science is 80% preparing data, 20% complaining about preparing data.
+> Data science is 80% preparing data, 20% complaining about preparing
+> data.
 
-Data tables are usually stored as files on a hard drive or as tables in a database (DB). Before starting with data analysis and modeling, these tables have to be preprocessed (filter rows, combine tables, restructure, rename, transform, ...). How much preprocessing is required depends strongly on the situation. While this process often feels like a waste of time, it is actually a good opportunity to learn 
+Data tables are usually stored as files on a hard drive or as tables in
+a database (DB). Before starting with data analysis and modeling, these
+tables have to be preprocessed (filter rows, combine tables,
+restructure, rename, transform, ...). How much preprocessing is required
+depends strongly on the situation. While this process often feels like a
+waste of time, it is actually a good opportunity to learn
 
-- how the data is structured, 
-- what information the columns bear, and
-- what possible sources of bias might be present.
+-   how the data is structured,
+-   what information the columns bear, and
+-   what possible sources of bias might be present.
 
-For small data sets, the raw data is usually loaded into R/Python and then preprocessed in memory. For large data sets, this becomes slow or even impossible. One option is to externalize the preprocessing to a database server with its out-of-core capabilities or to a big data technology like Spark. In this section, we take a short trip into that world.
+For small data sets, the raw data is usually loaded into R/Python and
+then preprocessed in memory. For large data sets, this becomes slow or
+even impossible. One option is to externalize the preprocessing to a
+database server with its out-of-core capabilities or to a big data
+technology like Spark. In this section, we take a short trip into that
+world.
 
 ## SQL
 
-Communication with the database is usually done with *SQL* (Structured Query Language). This is one of the most frequently used programming languages in data science. The SQL code is usually written directly in a Database Management System (DBMS) or in R/Python. SQL is pronounced as "es-kiu-el" or "si-kwel".
+Communication with the database is usually done with *SQL* (Structured
+Query Language). This is one of the most frequently used programming
+languages in data science. The SQL code is usually written directly in a
+Database Management System (DBMS) or in R/Python. SQL is pronounced as
+"es-kiu-el" or "si-kwel".
 
-We will introduce SQL with examples written in the in-process database [DuckDB](duckdb.org). "In-process" means that when DuckDB is run from R/Python, it is embedded in the R/Python process itself. DuckDB is convenient for several reasons:
+We will introduce SQL with examples written in the in-process database
+[DuckDB](duckdb.org). "In-process" means that when DuckDB is run from
+R/Python, it is embedded in the R/Python process itself. DuckDB is
+convenient for several reasons:
 
-- It is easy to install.
-- It has no external dependencies.
-- It is fast.
-- It supports working with csv/Parquet files as well as with R/Python tables.
-- It plays well together with Apache Arrow.
-- It works out-of-core, i.e., when data does not fit into RAM.
+-   It is easy to install.
+-   It has no external dependencies.
+-   It is fast.
+-   It supports working with csv/Parquet files as well as with R/Python
+    tables.
+-   It plays well together with Apache Arrow.
+-   It works out-of-core, i.e., when data does not fit into RAM.
 
-DuckDB has been released in 2018 as an open-source project written in C++. Later, we will also take a look at Spark, the famous big data technology.
+DuckDB has been released in 2018 as an open-source project written in
+C++. Later, we will also take a look at Spark, the famous big data
+technology.
 
-Remark: While there is an ISO norm for SQL, specific implementations (DuckDB, Spark, Oracle, SQL Server, ...) extend this standard command palette, resulting in different dialects. Thus, when googling a command, it will help to add the name of the implementation, like "extract hour from date in spark sql".
+Remark: While there is an ISO norm for SQL, specific implementations
+(DuckDB, Spark, Oracle, SQL Server, ...) extend this standard command
+palette, resulting in different dialects. Thus, when googling a command,
+it will help to add the name of the implementation, like "extract hour
+from date in spark sql".
 
 ### Example: SQL
 
-To familiarize you with SQL, we will write some basic SQL queries (= questions) with DuckDB about the diamond data. (Also remember the "Translator" table of Chapter 1.)
+To familiarize you with SQL, we will write some basic SQL queries (=
+questions) with DuckDB about the diamond data. (Also remember the
+"Translator" table of Chapter 1.)
 
-**Note that we use `head()` to keep the output slim. Usually, you would not need it.**
+**Note that we use `head()` to keep the output slim. Usually, you would
+not need it.**
 
 ```{r}
 library(duckdb)
@@ -723,12 +913,14 @@ dbDisconnect(con)
 
 ### Example: Taxi
 
-Here we will work directly with the taxi Parquet file. The goal is to answer the following four questions/tasks:
+Here we will work directly with the taxi Parquet file. The goal is to
+answer the following four questions/tasks:
 
-1. How do the first five rows look like?
-2. How many rows does the table have?
-3. Which pickup location IDs occur at least 100,000 times?
-4. Prepare the data similar to our original workflow "Parquet -> Arrow -> data.table".
+1.  How do the first five rows look like?
+2.  How many rows does the table have?
+3.  Which pickup location IDs occur at least 100,000 times?
+4.  Prepare the data similar to our original workflow "Parquet -\> Arrow
+    -\> data.table".
 
 ```{r}
 library(duckdb)
@@ -809,17 +1001,28 @@ system.time(
 head(df)
 ```
 
-**Comment:** The last query provides essentially the same model data as via Arrow and "data.table". Can you see differences?
+**Comment:** The last query provides essentially the same model data as
+via Arrow and "data.table". Can you see differences?
 
 ## Spark
 
-[Apache Spark](https://spark.apache.org/) is an open-source, distributed processing system used for working with big data. It has been part of the Apache Software Foundation since 2013 and is used extensively in industry. Its SQL engine can be used to process data of any size, also from within R or Python. Spark is written in the programming language "Scala", which is being developed at EPFL Lausanne under the direction of Martin Odersky, the creator of Scala.
+[Apache Spark](https://spark.apache.org/) is an open-source, distributed
+processing system used for working with big data. It has been part of
+the Apache Software Foundation since 2013 and is used extensively in
+industry. Its SQL engine can be used to process data of any size, also
+from within R or Python. Spark is written in the programming language
+"Scala", which is being developed at EPFL Lausanne under the direction
+of Martin Odersky, the creator of Scala.
 
-Spark normally runs on a cluster consisting of many hundreds of nodes (= computers). For illustration purposes, however, we will use a normal laptop here, i.e. a "cluster" with only one node.
+Spark normally runs on a cluster consisting of many hundreds of nodes (=
+computers). For illustration purposes, however, we will use a normal
+laptop here, i.e. a "cluster" with only one node.
 
 ### Example: Diamonds
 
-Let's start a local Spark instance and apply some small queries to the diamond data. We will use both SQL and "dplyr" code, which will then be translated into Spark.
+Let's start a local Spark instance and apply some small queries to the
+diamond data. We will use both SQL and "dplyr" code, which will then be
+translated into Spark.
 
 in industry: Spark is common, DuckDb not (too new)
 
@@ -973,20 +1176,50 @@ spark_disconnect(sc)
 
 # Exercises
 
-1. Use simple validation to determine whether a linear regression for `log(price)` with covariates `log(carat)`, `color`, `cut`, and `clarity` is better with or without interaction between `log(carat)` and `cut` regarding RMSE. Use a 80/20 data split. Make sure that the code is fully reproducible. 
+1.  Use simple validation to determine whether a linear regression for
+    `log(price)` with covariates `log(carat)`, `color`, `cut`, and
+    `clarity` is better with or without interaction between `log(carat)`
+    and `cut` regarding RMSE. Use a 80/20 data split. Make sure that the
+    code is fully reproducible.
 
-2. Use 5-fold cross-validation to select the best polynomial degree to represent `log(carat)` in a Gamma GLM for diamond prices with log-link (with additional covariates `color`, `cut`, and `clarity`). Evaluate the result on 10% test data. Use the average Gamma deviance as performance measure (function `deviance_gamma()` in the package "MetricsWeighted"). Again make sure that the code is fully reproducible.
+2.  Use 5-fold cross-validation to select the best polynomial degree to
+    represent `log(carat)` in a Gamma GLM for diamond prices with
+    log-link (with additional covariates `color`, `cut`, and `clarity`).
+    Evaluate the result on 10% test data. Use the average Gamma deviance
+    as performance measure (function `deviance_gamma()` in the package
+    "MetricsWeighted"). Again make sure that the code is fully
+    reproducible.
 
-3. How does repeated CV work? List one advantage and one disadvantage compared to standard cross-validation. When would you recommend grouped cross-validation and why? How does it work?
+3.  How does repeated CV work? List one advantage and one disadvantage
+    compared to standard cross-validation. When would you recommend
+    grouped cross-validation and why? How does it work?
 
-4. Use DuckDB or Apache Spark to write SQL queries about the claims data. We need some definitions first: In insurance, the *pure premium* is defined as the ratio of the total claim amount and the total exposure. Exposure is usually measured in years (1 = 1 year). The pure premium is the fictive premium per unit of exposure required to cover the claims. The claim frequency is the ratio of the total claim number and the total exposure. Finally, the claim severity is the ratio of total claim amount and total claim number. Consequently: pure premium = frequency * severity.
-    a. Calculate total exposure, pure premium, frequency and severity on the full data.
-    b. Do the same stratified by the age category of the driver. Sort the results by "agecat". Interpret the results.
-    c. How many distinct values does the column "X_OBSTAT_" have? Use the "DISTINCT" keyword in SQL.
-    d. Add to the full data a binary column "female" (1 = yes, 0 = no) derived from "gender". Use the "CASE WHEN" clause. Can you avoid the "CASE WHEN" construction here?
+4.  Use DuckDB or Apache Spark to write SQL queries about the claims
+    data. We need some definitions first: In insurance, the *pure
+    premium* is defined as the ratio of the total claim amount and the
+    total exposure. Exposure is usually measured in years (1 = 1 year).
+    The pure premium is the fictive premium per unit of exposure
+    required to cover the claims. The claim frequency is the ratio of
+    the total claim number and the total exposure. Finally, the claim
+    severity is the ratio of total claim amount and total claim number.
+    Consequently: pure premium = frequency \* severity.
+
+    a.  Calculate total exposure, pure premium, frequency and severity
+        on the full data.
+    b.  Do the same stratified by the age category of the driver. Sort
+        the results by "agecat". Interpret the results.
+    c.  How many distinct values does the column "X_OBSTAT\_" have? Use
+        the "DISTINCT" keyword in SQL.
+    d.  Add to the full data a binary column "female" (1 = yes, 0 = no)
+        derived from "gender". Use the "CASE WHEN" clause. Can you avoid
+        the "CASE WHEN" construction here?
 
 # Summary
 
-In this chapter, we have learned strategies to estimate model performance in a fair way. These strategies are used for model selection and tuning. As such, they are an essential part of the full modeling process. Furthermore, we have met the script language SQL to preprocess data of any size using technologies like DuckDB and Apache Spark.
+In this chapter, we have learned strategies to estimate model
+performance in a fair way. These strategies are used for model selection
+and tuning. As such, they are an essential part of the full modeling
+process. Furthermore, we have met the script language SQL to preprocess
+data of any size using technologies like DuckDB and Apache Spark.
 
 # References

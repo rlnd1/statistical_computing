@@ -1,0 +1,229 @@
+---
+title: "Summary2"
+author: "Roland Widmer"
+date: "2023-05-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Model selection and Validation
+
+Nearest neighbor, simple alternative to linear models
+(classification + regression)
+
+- searching k nearest neighbors (by means of Euclidean distance)
+- combination (regression: mean, classification: most frequent) of responses = prediction
+
+covariates needs to be standardized (scaling such that sd = 1)
+```{r}
+library(ggplot2)
+library(FNN) # fast nearest neighbor
+
+diamonds <- transform(diamonds, log_price = log(price), log_carat = log(carat))
+# log carat quite important for euclidean distances (?)
+
+y <- "log_price"
+x <- c("log_carat", "color", "cut", "clarity")
+
+X <- scale(data.matrix(diamonds[, x])) # Scaled numeric feature matrix
+apply(X, 2, FUN = sd) # column-wise sd, every thing 1 (so properly scaled)
+
+# The 10'000th observation
+diamonds[10000, c("price", "carat", x)]
+
+# Its prediction
+knn.reg(X, test = X[10000, ], k = 5, y = diamonds[[y]])
+# reg = regression
+# this value lives in log space, so use exp(...) to get other value
+
+# Its five nearest neighbors
+neighbors <- c(knnx.index(X, X[10000, , drop = FALSE], k = 5))
+diamonds[neighbors, ]
+
+# for KNN: scaling!
+# Standardize training data
+X_train <- scale(data.matrix(X_train)) # scale adds t
+
+# Apply training scale to validation data
+# IMPORTANT !!!!
+X_valid <- scale(
+  data.matrix(X_valid),
+  center = attr(X_train, "scaled:center"),
+  scale = attr(X_train, "scaled:scale")
+)
+```
+Simple validation
+
+Split data sets in D_train and D_valid (to test true performance or select model).
+D_valid = 10-30% of rows
+S(f_hat, D_valid) - S(f_hat, D_train) optimism/overfitting, should be small
+```{r}
+library(withr)
+
+diamonds <- transform(diamonds, log_price = log(price), log_carat = log(carat))
+
+y <- "log_price"
+x <- c("log_carat", "color", "cut", "clarity")
+
+# Split diamonds into 80% for "training" and 20% for validation
+with_seed(
+  9838,
+  ix <- sample(nrow(diamonds), 0.8 * nrow(diamonds))
+)
+
+y_train <- diamonds[ix, y]
+X_train <- diamonds[ix, x]
+
+y_valid <- diamonds[-ix, y]
+X_valid <- diamonds[-ix, x]
+```
+
+K-fold cross validation
+If training fast, and if we do not have a large dataset.
+
+K folds. Train model with k-1 folds and test it with the missing fold.
+Do this k times and calculate the CV performance as the mean of all performances.
+
+Repeat to test different models. Pick the model with the best CV performance
+
+- Retrain model on all folds
+- Look at standard deviation of all performances
+- Grid search: test all possible values hyperparameter values
+- Randomized search: consider only a random subset
+
+Final workflow:
+additional D_test (5%-20%) to prevent overfitting on validation data
+we use this just once in the end
+
+```{r}
+{r}
+library(ggplot2)
+library(FNN)
+library(withr)
+
+RMSE <- function(y, pred) {
+  sqrt(mean((y - pred)^2))
+}
+
+diamonds <- transform(diamonds, log_price = log(price), log_carat = log(carat))
+
+y <- "log_price"
+x <- c("log_carat", "color", "cut", "clarity")
+
+# Scaled feature matrix
+X <- scale(data.matrix(diamonds[x]))
+# not totally correct: perfect would be to scale it dependent on the folds
+# we have a small leakage of training data to validation data
+
+# Split diamonds into folds
+nfolds <- 5
+with_seed(
+  9838,
+  # we sample from [1, 2, 3, 4, 5]
+  # for each row in diamonds, we have an index -> states to which fold it belongs to 
+  # with replacement of course
+  fold_ix <- sample(1:nfolds, nrow(diamonds), replace = TRUE)
+)
+table(fold_ix)
+
+# Tuning grid with different values for parameter k
+paramGrid <- data.frame(RMSE = NA, k = 1:20)
+    
+# Calculate performance for each row in the parameter grid
+# important: We have two for loops!!
+for (i in 1:nrow(paramGrid)) {
+  # Why don't we use i directly?
+  # k does not have to coincide with i!
+  k <- paramGrid[i, "k"]
+  
+  scores <- numeric(nfolds)
+  
+  for (fold in 1:nfolds) {
+    insample <- fold_ix != fold
+    X_train <- X[insample, ]
+    y_train <- diamonds[insample, y]
+    
+    # why ! and not -? insample is a list of booleans!
+    # we use ! when working with booleans
+    X_valid <- X[!insample, ]
+    y_valid <- diamonds[!insample, y]
+
+    pred <- knn.reg(X_train, test = X_valid, k = k, y = y_train)$pred
+    scores[fold] <- RMSE(y_valid, pred)
+  }
+  paramGrid[i, "RMSE"] <- mean(scores)
+}
+
+# Best CV-scores 
+head(paramGrid[order(paramGrid$RMSE), ], 2)
+
+ggplot(paramGrid, aes(x = k, y = RMSE)) +
+  geom_point(color = "chartreuse4") +
+  geom_line(color = "chartreuse4") +
+  ggtitle("Performance by cross-validation")
+```
+Workflow A
+
+- Split data into train/valid/test, e.g., by ratios 60%/20%/20%.
+
+- Train different models on the training data and assess their performance on the validation data. Choose the best model, re-train it on the combination of training and validation data, and call it "final model".
+
+- Assess performance of the final model on the test data.
+
+Workflow B
+
+- Split data into train/test, e.g., by ratios 80%/20%.
+
+- Evaluate and tune different models by $K$-fold cross-validation on the training data. Select the best model and re-train it on the full training data.
+
+- Assess performance of the final model on the test data.
+
+
+Random splitting
+- Only allowed if rows are independent
+- Time-series data: split such that order is not destroyed, e.g. For simple validation, e.g., the first 80% of rows could be used for training and the remaining 20% for validation. 
+- If multiple rows per group (e.g. multiple rows per patient) - split by group and not by row (grouped splitting and group K-fold CV)
+- Stratified splitting: independent rows, better than independent: enforces similar distribution of a key variable across partitions/folds. Stratified splitting is often used when the response variable is binary and unbalanced. Unbalanced means that the proportion of "1" is close to 0 or 1
+
+SQL
+
+DuckDB
+
+```{r}
+library(duckdb)
+library(tidyverse)
+
+# Initialize virtual DB and register diamonds data
+con = dbConnect(duckdb())
+duckdb_register(con, name = "dia", df = diamonds)
+
+# Select every column (and every row)
+con %>% 
+  dbSendQuery("SELECT * FROM dia") %>% 
+  dbFetch() %>% 
+  head()  # See note above
+```
+
+Spark
+Apache Spark is an open-source, distributed processing system used for working with big data. It has been part of the Apache Software Foundation since 2013 and is used extensively in industry. (includes a SQL Engine)
+```{r, eval=FALSE}
+library(tidyverse)
+library(DBI)
+library(sparklyr)
+# spark_install("3.2")
+
+# Local Spark instance
+sc <- spark_connect(master = "local")
+# we see Java process in Task Manager
+# took 1 second, seems slow
+
+# Loads data to Spark
+dia <- copy_to(sc, diamonds)
+
+# SQL commands refer to Spark name "diamonds"
+dbGetQuery(sc, "SELECT COUNT(*) AS N FROM diamonds")
+```
+

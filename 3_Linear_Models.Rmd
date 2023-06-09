@@ -181,7 +181,7 @@ slope <- coef(fit)[[2]]
 # Visualize the regression line
 ggplot(diamonds, aes(x = carat, y = price)) + 
   geom_point(alpha = 0.2, shape = ".") +
-  coord_cartesian(xlim = c(0, 3), ylim = c(-3000, 20000)) +
+  coord_cartesian(xlim = c(0, 3), ylim = c(-3000, 20000)) + # clip chart
   geom_abline(slope = slope, intercept = intercept, color = "chartreuse4", size = 1)
 
 # Predictions for diamonds with 1.3 carat?
@@ -417,6 +417,7 @@ adding dummy variables for the categorical covariate `color`.
 library(ggplot2)
 
 # Turn ordered into unordered factor
+# if ordered: str(...) reports Ord.factor w/ 7 levels, Factor otherwise
 diamonds <- transform(diamonds, color = factor(color, ordered = FALSE))
 
 fit <- lm(price ~ carat + color, data = diamonds)
@@ -700,8 +701,8 @@ to_plot <- data.frame(carat = seq(0.3, 2.5, by = 0.1)) %>%
 # log-scale
 ggplot(to_plot, aes(x = carat, y = log(price))) +
   geom_point(data = diamonds, shape = ".", alpha = 0.2, color = "chartreuse4") + 
-  geom_line() +
-  geom_point() +
+  geom_line() + # regression line
+  # geom_point() + # regression points
   coord_cartesian(x = c(0, 3)) +
   ggtitle("log-scale")
 
